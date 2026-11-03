@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@import "../styles/asas.css";
+
+@theme inline {
+  --font-sans: var(--font-latin);
+  --font-mono: var(--font-mono);
+  --color-onyx: var(--onyx);
+  --color-graphite: var(--graphite);
+  --color-steel: var(--steel);
+  --color-silver: var(--silver);
+  --color-mist: var(--mist);
+  --color-champagne: var(--champagne);
+  --color-champagne-deep: var(--champagne-deep);
+  --color-porcelain: var(--porcelain);
+  --color-night: var(--night);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-text: var(--text);
+}
