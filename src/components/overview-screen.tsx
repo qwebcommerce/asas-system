@@ -2,7 +2,10 @@
 
 import { useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
+import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
+import { useDirectory } from "@/components/use-directory";
+import { initials, requestLabelKey } from "@/lib/directory";
 import { AiNote, Kpi } from "@/components/ui/card";
 import { Bars, ListRow } from "@/components/ui/data";
 import { Link } from "@/i18n/navigation";
@@ -19,13 +22,16 @@ const bars = [
 
 export function OverviewScreen() {
   const t = useTranslations();
+  const { profile } = useAuth();
+  const { users, requests } = useDirectory();
+  const admin = profile?.role === "superAdmin";
 
   return (
     <AppShell title={t("page.overview")}>
       <div className="page-header">
         <div>
-          <span className="eyebrow">{t("role.superAdmin")}</span>
-          <h2 className="page-title">{t("ov.hello")}</h2>
+          <span className="eyebrow">{profile ? t(`role.${profile.role}`) : t("role.superAdmin")}</span>
+          <h2 className="page-title">{profile?.name || t("ov.hello")}</h2>
           <p className="page-sub">{t("date.today")}</p>
         </div>
         <div className="hstack">
@@ -40,8 +46,8 @@ export function OverviewScreen() {
         </div>
       </div>
       <div className="grid-4">
-        <Kpi label={t("ov.k1")} value="6" note={t("ov.k1n")} noteTone="warn" />
-        <Kpi label={t("ov.k2")} value="48" note={t("ov.k2n")} />
+        <Kpi label={t("ov.k1")} value={String(requests.length)} note={t("us.openNote", { count: requests.length })} noteTone="warn" />
+        <Kpi label={t("ov.k2")} value={String(users.length)} note={t("ov.k2n")} />
         <Kpi label={t("ov.k3")} value="10" note={t("ov.k3n")} noteTone="ok" />
         <Kpi label={t("ov.k4")} value="4" note={t("ov.k4n")} dark />
       </div>
@@ -93,9 +99,16 @@ export function OverviewScreen() {
                 {t("common.viewAll")}
               </Link>
             </div>
-            <ListRow leading={<span className="avatar">{t("person.initials.yousef")}</span>} title={t("person.yousef")} detail={t("req.eng")} action={<button type="button" className="btn btn--secondary btn--sm">{t("btn.review")}</button>} />
-            <ListRow leading={<span className="avatar">{t("person.initials.fatima")}</span>} title={t("person.fatima")} detail={t("req.hr")} action={<button type="button" className="btn btn--secondary btn--sm">{t("btn.review")}</button>} />
-            <ListRow leading={<span className="avatar">{t("person.initials.khalid")}</span>} title={t("person.khalid")} detail={t("req.acc")} action={<button type="button" className="btn btn--secondary btn--sm">{t("btn.review")}</button>} />
+            {requests.length === 0 ? <p className="muted">{t("us.requestsEmpty")}</p> : null}
+            {requests.map((request) => (
+              <ListRow
+                key={request.id}
+                leading={<span className="avatar">{initials(request.name)}</span>}
+                title={request.name}
+                detail={t(requestLabelKey(request.requestedRole))}
+                action={admin ? <Link href="/users" className="btn btn--secondary btn--sm">{t("btn.review")}</Link> : null}
+              />
+            ))}
           </div>
           <AiNote title={t("ov.aiT")}>{t("ov.aiS")}</AiNote>
         </div>

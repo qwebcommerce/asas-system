@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.role == "superAdmin"
+        || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && ownUser().role == "superAdmin"
+          && ownUser().status != "disabled"
+        )
+      );
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (
+        signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["lastActiveAt"])
+      );
+      allow delete: if false;
+    }
+
+    match /accessRequests/{id} {
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == "pending";
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /audit/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    function activeRole(role) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && ownUser().status != "disabled"
+        && ownUser().role == role;
+    }
+
+    function canViewHr() {
+      return isAdmin() || activeRole("hr") || activeRole("accountant");
+    }
+
+    match /employees/{id} {
+      allow read: if canViewHr() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /leaveRequests/{id} {
+      allow read: if canViewHr() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /jobs/{id} {
+      allow read: if canViewHr();
+      allow write: if false;
+    }
+
+    match /applicants/{id} {
+      allow read: if canViewHr();
+      allow write: if false;
+    }
+
+    match /hrDocuments/{id} {
+      allow read: if canViewHr();
+      allow write: if false;
+    }
+
+    match /attendanceReports/{id} {
+      allow read: if canViewHr();
+      allow write: if false;
+    }
+
+    match /bankAccounts/{id} {
+      allow read: if isAdmin() || activeRole("accountant");
+      allow write: if false;
+    }
+
+    match /settings/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}

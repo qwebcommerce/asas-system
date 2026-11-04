@@ -1,22 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
 import { LanguageSwitch } from "@/components/language-switch";
 import { ThemeToggle } from "@/components/theme";
-import { Link, usePathname } from "@/i18n/navigation";
+import { initials } from "@/lib/directory";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 
 const workspace = [
   { id: "overview", href: "/overview", icon: "grid" },
   { id: "users", href: "/users", icon: "users" },
-  { id: "hr", href: "", icon: "brief" },
-  { id: "reports", href: "", icon: "report" },
-  { id: "offers", href: "", icon: "ruler" },
-  { id: "documents", href: "", icon: "folder" },
-  { id: "accounting", href: "", icon: "wallet" },
-  { id: "payroll", href: "", icon: "card" },
-  { id: "email", href: "", icon: "mail" },
+  { id: "hr", href: "/hr", icon: "brief" },
+  { id: "reports", href: "/reports", icon: "report" },
+  { id: "offers", href: "/offers", icon: "ruler" },
+  { id: "documents", href: "/documents", icon: "folder" },
+  { id: "accounting", href: "/accounting", icon: "wallet" },
+  { id: "payroll", href: "/payroll", icon: "card" },
+  { id: "email", href: "/email", icon: "mail" },
 ] as const;
 
 export function AppShell({
@@ -27,10 +29,25 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const t = useTranslations();
-  const locale = useLocale();
   const pathname = usePathname();
+  const router = useRouter();
+  const { ready, configured, user, profile, signOutUser } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+
+  useEffect(() => {
+    if (ready && configured && !user) router.replace("/");
+  }, [configured, ready, router, user]);
+
+  if (!ready || (configured && user && !profile)) return null;
+  if (!configured) {
+    return (
+      <main className="content">
+        <p>{t("auth.notConfigured")}</p>
+      </main>
+    );
+  }
+  if (!profile) return null;
 
   return (
     <>
@@ -53,7 +70,7 @@ export function AppShell({
                 href={item.href}
                 icon={item.icon}
                 label={t(`nav.${item.id}`)}
-                active={item.href !== "" && pathname === item.href}
+                active={pathname === item.href}
                 onNavigate={() => setMenuOpen(false)}
               />
             ))}
@@ -63,25 +80,31 @@ export function AppShell({
             <Icon name="spark" />
             <span>{t("nav.ai")}</span>
           </button>
-          <span className="nav-item">
-            <Icon name="shield" />
-            <span>{t("nav.settings")}</span>
-          </span>
+          <NavItem
+            href="/settings"
+            icon="shield"
+            label={t("nav.settings")}
+            active={pathname === "/settings"}
+            onNavigate={() => setMenuOpen(false)}
+          />
           <div className="spacer" />
           <div className="me">
-            <span className="avatar">{locale === "ar" ? "عس" : "AS"}</span>
+            <span className="avatar">{initials(profile.name)}</span>
             <div className="grow">
-              <b>{locale === "ar" ? "عبدالله س." : "Abdullah S."}</b>
-              <small>{t("role.superAdmin")}</small>
+              <b>{profile.name}</b>
+              <small>{t(`role.${profile.role}`)}</small>
             </div>
-            <Link
-              href="/"
+            <button
+              type="button"
               className="icon-btn"
               style={{ background: "transparent", border: 0, color: "var(--steel)" }}
               aria-label={t("nav.signOut")}
+              onClick={() => {
+                void signOutUser().then(() => router.replace("/"));
+              }}
             >
               <Icon name="logout" className="icon icon--flip" />
-            </Link>
+            </button>
           </div>
         </aside>
         <div className="main">
