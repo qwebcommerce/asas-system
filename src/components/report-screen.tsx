@@ -1,150 +1,101 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
+import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
-import { Link } from "@/i18n/navigation";
+import { useReports } from "@/components/use-reports";
 import { Toast } from "@/components/ui/overlay";
-
-const services = ["construction", "finishing", "interior", "furniture", "plans"] as const;
-const rows = [
-  { area: "areaMajlis", work: "workGypsum", done: "100%", status: "complete", badge: "ok" },
-  { area: "areaDining", work: "workGypsum", done: "100%", status: "complete", badge: "ok" },
-  { area: "areaBeds", work: "workPrimer", done: "40%", status: "progress", badge: "info" },
-  { area: "areaBeds", work: "workPorcelain", done: "0%", status: "waiting", badge: "warn" },
-] as const;
+import { Link } from "@/i18n/navigation";
+import { projectTitle } from "@/lib/reports";
+import { deleteProjectReport } from "@/server/reports";
 
 export function ReportScreen() {
   const t = useTranslations();
-  const [service, setService] = useState<(typeof services)[number]>("finishing");
+  const locale = useLocale();
+  const { getToken } = useAuth();
+  const { reports, ready, canManage, canView } = useReports();
   const [toast, setToast] = useState<{ title: string; detail: string } | null>(null);
-
-  function notify(title: string, detail: string) {
-    setToast({ title, detail });
-    window.setTimeout(() => setToast(null), 3000);
-  }
+  const [error, setError] = useState("");
+  const ordered = [...reports].sort((a, b) => b.date.localeCompare(a.date) || projectTitle(a, locale).localeCompare(projectTitle(b, locale)));
 
   return (
-    <AppShell title={t("rep.title")}>
-      <Link href="/reports" className="back">
-        <Icon name="chevl" className="icon icon--sm icon--flip" />
-        <span>{t("rep.back")}</span>
-      </Link>
-      <div className="split split--wide">
-        <div className="card stack">
-          <div className="between">
-            <h2 className="card-title" style={{ fontSize: 18 }}>{t("rep.title")}</h2>
-            <button type="button" className="chip chip--ai">
-              <Icon name="spark" className="icon icon--sm" />
-              {t("rep.ai")}
-            </button>
-          </div>
-          <div className="form-grid">
-            <div className="field">
-              <label>{t("rep.project")}</label>
-              <select className="select" defaultValue="lusail">
-                <option value="lusail">{t("sample.projectLusail")}</option>
-              </select>
-            </div>
-            <div className="field">
-              <label>{t("rep.date")}</label>
-              <input className="input" type="date" defaultValue="2026-11-02" />
-            </div>
-            <div className="field">
-              <label>{t("rep.weather")}</label>
-              <select className="select">
-                <option>{t("sample.weather")}</option>
-              </select>
-            </div>
-          </div>
-          <div className="field">
-            <span className="label">{t("rep.service")}</span>
-            <div className="hstack">
-              {services.map((item) => (
-                <button key={item} type="button" className="chip" aria-pressed={service === item} onClick={() => setService(item)}>
-                  {t(`svc.${item}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="card card--flush table-wrap">
-            <table className="table table--cards">
-              <thead>
-                <tr>
-                  <th>{t("col.area")}</th>
-                  <th>{t("col.work")}</th>
-                  <th>{t("col.done")}</th>
-                  <th>{t("col.status")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={`${row.area}-${row.work}`}>
-                    <td data-label={t("col.area")} className="strong">{t(`sample.${row.area}`)}</td>
-                    <td data-label={t("col.work")}>{t(`sample.${row.work}`)}</td>
-                    <td data-label={t("col.done")} className="num"><bdi>{row.done}</bdi></td>
-                    <td data-label={t("col.status")}>
-                      <span className={`badge badge--${row.badge}`}>{t(`wi.${row.status}`)}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="form-grid">
-            <div className="field">
-              <label>{t("rep.workers")}</label>
-              <input className="input num" defaultValue="14" />
-            </div>
-            <div className="field">
-              <label>{t("rep.subs")}</label>
-              <input className="input" defaultValue={t("sample.subs")} />
-            </div>
-            <div className="field">
-              <label>{t("rep.progress")}</label>
-              <input className="input num" defaultValue="65%" />
-            </div>
-          </div>
-          <div className="field">
-            <label>{t("rep.issues")}</label>
-            <textarea className="textarea" defaultValue={t("sample.issues")} />
-          </div>
+    <AppShell title={t("nav.reports")}>
+      <div className="page-header">
+        <div>
+          <span className="eyebrow">{t("nav.reports")}</span>
+          <h2 className="page-title">{t("nav.reports")}</h2>
+          <p className="page-sub">{ready ? t("rep.count", { count: reports.length }) : t("common.loading")}</p>
         </div>
-        <div className="stack">
-          <div className="card stack stack--sm">
-            <div className="between">
-              <h3 className="card-title">{t("rep.photos")}</h3>
-              <small className="muted num">3 / 10</small>
-            </div>
-            <div className="grid-2">
-              <div className="photo" />
-              <div className="photo" style={{ background: "var(--steel)" }} />
-              <div className="photo" style={{ background: "var(--mist)" }} />
-              <label className="dropzone">
-                <Icon name="camera" />
-                <span>{t("rep.add")}</span>
-                <input type="file" accept="image/*" capture="environment" hidden />
-              </label>
-            </div>
-          </div>
-          <div className="ai">
-            <Icon name="spark" />
-            <div>
-              <b>{t("rep.checkT")}</b>
-              <span>{t("rep.checkS")}</span>
-            </div>
-          </div>
-          <button type="button" className="btn btn--primary btn--lg" onClick={() => notify(t("rep.sentT"), t("rep.sentS"))}>
-            <Icon name="send" />
-            {t("rep.submit")}
-          </button>
-          <button type="button" className="btn btn--secondary" onClick={() => notify(t("btn.saveDraft"), t("sample.draftSaved"))}>
-            {t("btn.saveDraft")}
-          </button>
-        </div>
+        {canManage ? (
+          <Link href="/reports/new" className="btn btn--primary">
+            <Icon name="plus" />
+            {t("rep.new")}
+          </Link>
+        ) : null}
       </div>
+      {!canView ? <p className="muted">{t("rep.forbidden")}</p> : null}
+      {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
+      {canView ? (
+        <div className="card card--flush table-wrap">
+          <table className="table table--cards">
+            <thead>
+              <tr>
+                <th>{t("rep.date")}</th>
+                <th>{t("rep.project")}</th>
+                <th>{t("rep.service")}</th>
+                <th>{t("rep.progress")}</th>
+                {canManage ? <th /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {ordered.length === 0 ? <tr><td colSpan={canManage ? 5 : 4}>{ready ? t("rep.empty") : t("common.loading")}</td></tr> : null}
+              {ordered.map((report) => (
+                <tr key={report.id}>
+                  <td data-label={t("rep.date")} className="num">{formatDay(report.date, locale)}</td>
+                  <td data-label={t("rep.project")}>
+                    <b>{projectTitle(report, locale)}</b>
+                    <small className="muted" style={{ display: "block" }}>{locale === "ar" ? report.projectEn : report.projectAr}</small>
+                  </td>
+                  <td data-label={t("rep.service")}>{t(`svc.${report.service}`)}</td>
+                  <td data-label={t("rep.progress")} className="num"><bdi>{report.progress}%</bdi></td>
+                  {canManage ? (
+                    <td className="end" data-label="">
+                      <div className="hstack">
+                        <Link href={`/reports/${report.id}`} className="btn btn--secondary btn--sm">{t("us.edit")}</Link>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => {
+                            void (async () => {
+                              const result = await deleteProjectReport(await getToken(), report.id);
+                              if (!result.ok) {
+                                setError(t(result.error ?? "auth.failed"));
+                                return;
+                              }
+                              setError("");
+                              setToast({ title: t("rep.removed"), detail: projectTitle(report, locale) });
+                              window.setTimeout(() => setToast(null), 3000);
+                            })();
+                          }}
+                        >
+                          {t("us.delete")}
+                        </button>
+                      </div>
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
       <Toast open={Boolean(toast)} title={toast?.title ?? ""} detail={toast?.detail ?? ""} />
     </AppShell>
   );
+}
+
+function formatDay(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "Asia/Qatar", numberingSystem: "latn" }).format(new Date(`${value}T12:00:00+03:00`));
 }

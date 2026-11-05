@@ -1,11 +1,13 @@
 import { isDepartment, type Department } from "@/lib/directory";
 
-export const attendanceStatuses = ["present", "late", "annual", "sick"] as const;
+export const attendanceStatuses = ["present", "late", "absent", "annual", "sick"] as const;
+export const employmentStates = ["active", "inactive"] as const;
 export const leaveKinds = ["annual", "sick"] as const;
 export const applicantStages = ["new", "review", "offer", "hired"] as const;
 export const hrDocStatuses = ["draft", "signed", "expired"] as const;
 
 export type AttendanceStatus = (typeof attendanceStatuses)[number];
+export type Employment = (typeof employmentStates)[number];
 export type LeaveKind = (typeof leaveKinds)[number];
 export type ApplicantStage = (typeof applicantStages)[number];
 export type HrDocStatus = (typeof hrDocStatuses)[number];
@@ -19,13 +21,11 @@ export type Employee = {
   department: Department;
   mobile: string;
   joined: string;
-  status: AttendanceStatus;
+  employment: Employment;
   userId: string;
   idExpiry: string;
   passportExpiry: string;
   visaExpiry: string;
-  bankName: string;
-  ibanLast4: string;
   basic: number | null;
 };
 
@@ -36,6 +36,8 @@ export type LeaveRequest = {
   name: string;
   kind: LeaveKind;
   days: number;
+  startsOn: string;
+  endsOn: string;
   note: string;
   status: "pending" | "approved" | "declined";
 };
@@ -62,6 +64,17 @@ export type HrDocument = {
   titleAr: string;
   status: HrDocStatus;
   expiresAt: string;
+  hasFile: boolean;
+};
+
+export type EmployeeFile = {
+  id: string;
+  employeeId: string;
+  userId: string;
+  titleEn: string;
+  titleAr: string;
+  contentType: string;
+  size: number;
 };
 
 export type AttendanceReport = {
@@ -71,6 +84,7 @@ export type AttendanceReport = {
   present: number;
   onLeave: number;
   late: number;
+  absent: number;
   employees: number;
 };
 
@@ -91,8 +105,8 @@ function day(value: unknown) {
 }
 
 export function mapEmployee(id: string, data: Record<string, unknown>): Employee {
-  const status = attendanceStatuses.find((item) => item === data.status) ?? "present";
   const department = typeof data.department === "string" && isDepartment(data.department) ? data.department : "site";
+  const employment = data.employment === "inactive" ? "inactive" : "active";
   return {
     id,
     name: text(data.name),
@@ -102,15 +116,20 @@ export function mapEmployee(id: string, data: Record<string, unknown>): Employee
     department,
     mobile: text(data.mobile),
     joined: day(data.joined),
-    status,
+    employment,
     userId: text(data.userId),
     idExpiry: day(data.idExpiry),
     passportExpiry: day(data.passportExpiry),
     visaExpiry: day(data.visaExpiry),
-    bankName: text(data.bankName),
-    ibanLast4: text(data.ibanLast4),
     basic: typeof data.basic === "number" ? data.basic : null,
   };
+}
+
+export function mapAttendance(data: Record<string, unknown>): { employeeId: string; status: AttendanceStatus } | null {
+  const employeeId = text(data.employeeId);
+  const status = attendanceStatuses.find((item) => item === data.status);
+  if (!employeeId || !status) return null;
+  return { employeeId, status };
 }
 
 export function mapLeave(id: string, data: Record<string, unknown>): LeaveRequest | null {
@@ -124,6 +143,8 @@ export function mapLeave(id: string, data: Record<string, unknown>): LeaveReques
     name: text(data.name),
     kind,
     days: typeof data.days === "number" ? data.days : 0,
+    startsOn: day(data.startsOn),
+    endsOn: day(data.endsOn),
     note: text(data.note),
     status,
   };
@@ -151,7 +172,22 @@ export function mapApplicant(id: string, data: Record<string, unknown>): Applica
 export function mapHrDocument(id: string, data: Record<string, unknown>): HrDocument | null {
   const status = hrDocStatuses.find((item) => item === data.status) ?? "draft";
   if (!text(data.titleEn)) return null;
-  return { id, titleEn: text(data.titleEn), titleAr: text(data.titleAr), status, expiresAt: day(data.expiresAt) };
+  return { id, titleEn: text(data.titleEn), titleAr: text(data.titleAr), status, expiresAt: day(data.expiresAt), hasFile: text(data.storagePath).length > 0 };
+}
+
+export function mapEmployeeFile(id: string, data: Record<string, unknown>): EmployeeFile | null {
+  const titleEn = text(data.titleEn);
+  const employeeId = text(data.employeeId);
+  if (!titleEn || !employeeId) return null;
+  return {
+    id,
+    employeeId,
+    userId: text(data.userId),
+    titleEn,
+    titleAr: text(data.titleAr),
+    contentType: text(data.contentType),
+    size: typeof data.size === "number" ? data.size : 0,
+  };
 }
 
 export function mapReport(id: string, data: Record<string, unknown>): AttendanceReport {
@@ -164,6 +200,7 @@ export function mapReport(id: string, data: Record<string, unknown>): Attendance
     present: typeof data.present === "number" ? data.present : 0,
     onLeave: typeof data.onLeave === "number" ? data.onLeave : 0,
     late: typeof data.late === "number" ? data.late : 0,
+    absent: typeof data.absent === "number" ? data.absent : 0,
     employees: typeof data.employees === "number" ? data.employees : 0,
   };
 }
@@ -171,6 +208,14 @@ export function mapReport(id: string, data: Record<string, unknown>): Attendance
 export function positionOf(employee: Employee, locale: string) {
   if (locale === "ar") return employee.positionAr || employee.positionEn;
   return employee.positionEn || employee.positionAr;
+}
+
+export function inclusiveDays(start: string, end: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end < start) return 0;
+  const from = Date.parse(`${start}T12:00:00+03:00`);
+  const to = Date.parse(`${end}T12:00:00+03:00`);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return 0;
+  return Math.round((to - from) / 86_400_000) + 1;
 }
 
 export function isPast(dayValue: string) {

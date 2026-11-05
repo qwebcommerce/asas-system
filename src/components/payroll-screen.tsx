@@ -58,11 +58,6 @@ export function PayrollScreen() {
             {t("pay.cash")}
           </button>
         </div>
-        <select className="select" style={{ width: 260 }} aria-label={t("pay.from")}>
-          <option>{t("sample.bankQnb")}</option>
-          <option>{t("sample.bankCbq")}</option>
-          <option>{t("sample.bankDoha")}</option>
-        </select>
       </div>
       {method === "bank" ? (
         <div className="card card--flush table-wrap">
@@ -106,11 +101,7 @@ export function PayrollScreen() {
         </div>
       )}
       <div className="card between">
-        <span className="hstack muted">
-          <Icon name="lock" className="icon icon--sm" />
-          {t("pay.lock")}
-        </span>
-        <div className="hstack">
+        <div className="hstack" style={{ marginInlineStart: "auto" }}>
           <div style={{ textAlign: "end" }}>
             <small className="muted" style={{ display: "block" }}>{t("pay.total44")}</small>
             <strong className="num" style={{ fontSize: 26, fontWeight: 300 }}>{t("sample.payTotal")}</strong>
@@ -128,7 +119,6 @@ export function PayrollScreen() {
           <small style={{ color: "var(--mist)" }}>{t("pay.to44")}</small>
         </div>
         <div>
-          <div className="kv"><span>{t("pay.from")}</span><b className="num">{t("sample.bankQnb")}</b></div>
           <div className="kv"><span>{t("pay.approvedBy")}</span><b>{t("sample.ceo")}</b></div>
           <div className="kv"><span>{t("pay.month")}</span><b>{t("pay.oct")}</b></div>
         </div>

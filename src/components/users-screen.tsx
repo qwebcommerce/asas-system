@@ -9,9 +9,9 @@ import { useAccessAdmin } from "@/components/use-access";
 import { useDirectory } from "@/components/use-directory";
 import { Tabs } from "@/components/ui/data";
 import { Modal, Toast } from "@/components/ui/overlay";
-import { levelKey, matrixModules, matrixRoles, moduleKey, permissionLevels, type BankAccount, type MatrixRole, type PermissionLevel, type RoleMatrix } from "@/lib/access";
+import { isLockedRole, levelKey, matrixModules, matrixRoles, moduleKey, permissionLevels, type MatrixRole, type PermissionLevel, type RoleMatrix } from "@/lib/access";
 import { departments, initials, roles, type Department, type DirectoryUser, type Role } from "@/lib/directory";
-import { deleteBankAccount, saveBankAccount, updatePermission } from "@/server/access";
+import { saveRoleMatrix } from "@/server/access";
 import { createDirectoryUser, deleteDirectoryUser, setUsersDisabled, updateDirectoryUser } from "@/server/directory";
 
 export function UsersScreen() {
@@ -19,7 +19,7 @@ export function UsersScreen() {
   const locale = useLocale();
   const { profile, getToken } = useAuth();
   const { users, ready } = useDirectory();
-  const { banks, matrix } = useAccessAdmin(profile?.role === "superAdmin");
+  const { matrix } = useAccessAdmin(profile?.role === "superAdmin");
   const [tab, setTab] = useState("users");
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -92,7 +92,6 @@ export function UsersScreen() {
         items={[
           { id: "users", label: t("ut.users") },
           { id: "roles", label: t("ut.roles") },
-          { id: "bank", label: t("ut.bank") },
         ]}
       />
       {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
@@ -238,15 +237,7 @@ export function UsersScreen() {
       {tab === "roles" ? (
         <RolesMatrix
           matrix={matrix}
-          onChange={(role, module, level) => void run(async () => updatePermission(await getToken(), role, module, level), t("us.roleUpdated"), "")}
-        />
-      ) : null}
-      {tab === "bank" ? (
-        <BankPanel
-          banks={banks}
-          locale={locale}
-          onSave={async (input) => run(async () => saveBankAccount(await getToken(), input), t("us.bankSaved"), input.name)}
-          onDelete={async (id, name) => run(async () => deleteBankAccount(await getToken(), id), t("us.bankDeleted"), name)}
+          onSave={(next) => run(async () => saveRoleMatrix(await getToken(), next), t("us.permissionsSaved"), "")}
         />
       ) : null}
       <InviteDialog
@@ -436,121 +427,69 @@ function formatActive(value: number | null, locale: string, empty: string) {
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", numberingSystem: "latn", timeZone: "Asia/Qatar" }).format(value);
 }
 
-function RolesMatrix({ matrix, onChange }: { matrix: RoleMatrix; onChange: (role: MatrixRole, module: (typeof matrixModules)[number], level: PermissionLevel) => void }) {
-  const t = useTranslations();
-  return (
-    <div className="card card--flush table-wrap">
-      <table className="table">
-        <thead>
-          <tr>
-            <th>{t("acc.modules")}</th>
-            {matrixRoles.map((role) => <th key={role}>{role === "ceo" ? t("sample.ceo") : t(`role.${role}`)}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {matrixModules.map((module) => (
-            <tr key={module}>
-              <td className="strong">{t(moduleKey(module))}</td>
-              {matrixRoles.map((role) => (
-                <td key={role}>
-                  {role === "superAdmin" && module === "users" ? t(levelKey("full")) : (
-                    <select className="select select--sm" aria-label={`${t(moduleKey(module))} ${role}`} value={matrix[role][module]} onChange={(event) => onChange(role, module, event.target.value as PermissionLevel)}>
-                      {permissionLevels.map((level) => <option key={level} value={level}>{t(levelKey(level))}</option>)}
-                    </select>
-                  )}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function samePermissions(left: RoleMatrix, right: RoleMatrix) {
+  return matrixRoles.every((role) => isLockedRole(role) || matrixModules.every((module) => left[role][module] === right[role][module]));
 }
 
-function BankPanel({
-  banks,
-  locale,
-  onSave,
-  onDelete,
-}: {
-  banks: BankAccount[];
-  locale: string;
-  onSave: (input: { id?: string; name: string; bank: string; last4: string; balance: number }) => Promise<boolean>;
-  onDelete: (id: string, name: string) => Promise<boolean>;
-}) {
+function RolesMatrix({ matrix, onSave }: { matrix: RoleMatrix; onSave: (next: RoleMatrix) => Promise<boolean> }) {
   const t = useTranslations();
-  const [id, setId] = useState<string | undefined>();
-  const [name, setName] = useState("");
-  const [bank, setBank] = useState("");
-  const [last4, setLast4] = useState("");
-  const [balance, setBalance] = useState("");
-  const money = new Intl.NumberFormat(locale, { style: "currency", currency: "QAR", numberingSystem: "latn" });
+  const [draft, setDraft] = useState<RoleMatrix | null>(null);
+  const [saving, setSaving] = useState(false);
+  const current = draft ?? matrix;
+  const dirty = draft !== null && !samePermissions(draft, matrix);
+
+  useEffect(() => {
+    if (draft && samePermissions(draft, matrix)) setDraft(null);
+  }, [draft, matrix]);
+
+  function change(role: MatrixRole, module: (typeof matrixModules)[number], level: PermissionLevel) {
+    setDraft((previous) => {
+      const next = structuredClone(previous ?? matrix);
+      next[role][module] = level;
+      return next;
+    });
+  }
+
+  async function save() {
+    if (!draft || saving) return;
+    setSaving(true);
+    await onSave(draft);
+    setSaving(false);
+  }
 
   return (
-    <div className="stack">
-      {banks.length === 0 ? <p className="muted">{t("us.bankEmpty")}</p> : null}
-      {banks.map((account) => (
-        <div className="card between" key={account.id}>
-          <div>
-            <b>{account.name}</b>
-            <small className="muted" style={{ display: "block" }}>{account.bank} ···· {account.last4}</small>
-          </div>
-          <div className="hstack">
-            <span className="num">{money.format(account.balance)}</span>
-            <button
-              type="button"
-              className="btn btn--secondary btn--sm"
-              onClick={() => {
-                setId(account.id);
-                setName(account.name);
-                setBank(account.bank);
-                setLast4(account.last4);
-                setBalance(String(account.balance));
-              }}
-            >
-              {t("us.edit")}
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() => void onDelete(account.id, account.name).then((ok) => {
-                if (!ok || id !== account.id) return;
-                setId(undefined);
-                setName("");
-                setBank("");
-                setLast4("");
-                setBalance("");
-              })}
-            >
-              {t("us.delete")}
-            </button>
-          </div>
-        </div>
-      ))}
-      <form
-        className="card stack"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void onSave({ id, name, bank, last4, balance: Number(balance) }).then((ok) => {
-            if (!ok) return;
-            setId(undefined);
-            setName("");
-            setBank("");
-            setLast4("");
-            setBalance("");
-          });
-        }}
-      >
-        <h3 className="card-title">{id ? t("us.edit") : t("us.addBank")}</h3>
-        <Field label={t("us.accountName")} value={name} onChange={setName} />
-        <Field label={t("us.bankName")} value={bank} onChange={setBank} />
-        <Field label={t("us.last4")} value={last4} onChange={setLast4} />
-        <Field label={t("us.balance")} value={balance} onChange={setBalance} type="number" />
-        <button type="submit" className="btn btn--primary">{t("set.save")}</button>
-      </form>
-      <p className="muted">{t("pay.lock")}</p>
-    </div>
+    <>
+      <div className="hstack" style={{ justifyContent: "flex-end" }}>
+        <button type="button" className="btn btn--ghost" disabled={!dirty || saving} onClick={() => setDraft(null)}>{t("us.discard")}</button>
+        <button type="button" className="btn btn--primary" disabled={!dirty || saving} onClick={() => void save()}>{t("set.save")}</button>
+      </div>
+      <div className="card card--flush table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>{t("acc.modules")}</th>
+              {matrixRoles.map((role) => <th key={role}>{role === "ceo" ? t("sample.ceo") : t(`role.${role}`)}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {matrixModules.map((module) => (
+              <tr key={module}>
+                <td className="strong">{t(moduleKey(module))}</td>
+                {matrixRoles.map((role) => (
+                  <td key={role}>
+                    {isLockedRole(role) ? t(levelKey("full")) : (
+                      <select className="select select--sm" aria-label={`${t(moduleKey(module))} ${role}`} value={current[role][module]} disabled={saving} onChange={(event) => change(role, module, event.target.value as PermissionLevel)}>
+                        {permissionLevels.map((level) => <option key={level} value={level}>{t(levelKey(level))}</option>)}
+                      </select>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

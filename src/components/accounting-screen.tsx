@@ -46,7 +46,6 @@ export function AccountingScreen() {
           { id: "dash", label: t("at.dash") },
           { id: "inv", label: t("at.inv") },
           { id: "bills", label: t("at.bills") },
-          { id: "banks", label: t("at.banks") },
           { id: "journal", label: t("at.journal") },
           { id: "reports", label: t("at.reports") },
         ]}
@@ -67,13 +66,6 @@ export function AccountingScreen() {
             <span className="num">{t("sample.cheque2")}</span>
           </div>
           <p className="muted">{t("acc.k3n")}</p>
-        </div>
-      ) : null}
-      {tab === "banks" ? (
-        <div className="stack">
-          <BankRow name={t("sample.bankQnb")} amount={t("sample.qnbBal")} />
-          <BankRow name={t("sample.bankCbq")} amount={t("sample.cbqBal")} />
-          <BankRow name={t("sample.bankDoha")} amount={t("sample.dohaBal")} />
         </div>
       ) : null}
       {tab === "journal" ? (
@@ -150,15 +142,6 @@ function Dashboard() {
         </div>
       </div>
     </>
-  );
-}
-
-function BankRow({ name, amount }: { name: string; amount: string }) {
-  return (
-    <div className="card between">
-      <b>{name}</b>
-      <span className="num">{amount}</span>
-    </div>
   );
 }
 

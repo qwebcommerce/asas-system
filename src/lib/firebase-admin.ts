@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 export function isAdminConfigured() {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) return true;
@@ -11,7 +12,10 @@ function adminApp(): App {
   if (getApps().length > 0) return getApps()[0]!;
   const json = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (json) {
-    return initializeApp({ credential: cert(JSON.parse(json) as Record<string, string>) });
+    return initializeApp({
+      credential: cert(JSON.parse(json) as Record<string, string>),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    });
   }
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
@@ -19,7 +23,10 @@ function adminApp(): App {
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error("not-configured");
   }
-  return initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+  return initializeApp({
+    credential: cert({ projectId, clientEmail, privateKey }),
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  });
 }
 
 export function adminAuth() {
@@ -28,4 +35,10 @@ export function adminAuth() {
 
 export function adminDb() {
   return getFirestore(adminApp());
+}
+
+export function adminBucket() {
+  const name = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  if (!name) throw new Error("not-configured");
+  return getStorage(adminApp()).bucket(name);
 }

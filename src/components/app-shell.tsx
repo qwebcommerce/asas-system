@@ -70,7 +70,7 @@ export function AppShell({
                 href={item.href}
                 icon={item.icon}
                 label={t(`nav.${item.id}`)}
-                active={pathname === item.href}
+                active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
                 onNavigate={() => setMenuOpen(false)}
               />
             ))}

@@ -81,13 +81,33 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /employeeFiles/{id} {
+      allow read: if canViewHr() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /attendanceMarks/{id} {
+      allow read: if canViewHr() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
     match /attendanceReports/{id} {
       allow read: if canViewHr();
       allow write: if false;
     }
 
-    match /bankAccounts/{id} {
-      allow read: if isAdmin() || activeRole("accountant");
+    match /projectReports/{id} {
+      allow read: if isAdmin() || activeRole("engineer") || activeRole("accountant");
+      allow write: if false;
+    }
+
+    match /offers/{id} {
+      allow read: if isAdmin() || activeRole("engineer") || activeRole("accountant");
+      allow write: if false;
+    }
+
+    match /reportFiles/{id} {
+      allow read: if isAdmin() || activeRole("engineer") || activeRole("accountant");
       allow write: if false;
     }
 

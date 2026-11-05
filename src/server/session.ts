@@ -28,3 +28,11 @@ export async function audit(action: string, actorId: string, targetId: string, d
 export function canManageHr(role: string) {
   return role === "superAdmin" || role === "hr";
 }
+
+export function canManageReports(role: string) {
+  return role === "superAdmin" || role === "engineer";
+}
+
+export function canManageOffers(role: string) {
+  return role === "superAdmin" || role === "engineer";
+}
