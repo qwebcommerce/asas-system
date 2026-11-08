@@ -40,3 +40,7 @@ export function canManageOffers(role: string) {
 export function canManagePayroll(role: string) {
   return role === "superAdmin" || role === "accountant";
 }
+
+export function canManageAccounting(role: string) {
+  return role === "superAdmin" || role === "accountant";
+}

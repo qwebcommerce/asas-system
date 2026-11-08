@@ -199,7 +199,7 @@ export function PayrollScreen() {
                 {canManage && run.status !== "paid" ? (
                   <button type="button" className="btn btn--ghost" onClick={() => void act(deletePayrollRun, t("pay.removed"))}>{t("us.delete")}</button>
                 ) : null}
-                {editable ? <button type="button" className="btn btn--secondary" onClick={() => void save()}>{t("us.save")}</button> : null}
+                {editable ? <button type="button" className="btn btn--secondary" onClick={() => void save()}>{t("set.save")}</button> : null}
                 {canApprove && run.status === "draft" ? <button type="button" className="btn btn--primary" onClick={() => void act(approvePayrollRun, t("pay.approved"))}>{t("pay.approve")}</button> : null}
                 {canApprove && run.status === "approved" ? <button type="button" className="btn btn--secondary" onClick={() => void act(reopenPayrollRun, t("pay.reopen"))}>{t("pay.reopen")}</button> : null}
                 {canManage && run.status === "approved" ? (
