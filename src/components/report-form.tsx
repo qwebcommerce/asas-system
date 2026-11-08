@@ -73,6 +73,7 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
   const [issues, setIssues] = useState(initial?.issues ?? "");
   const [items, setItems] = useState<DraftItem[]>(() => (initial?.items ?? []).map((item, index) => ({ ...item, key: `${initial?.id ?? "new"}-${index}` })));
   const [error, setError] = useState("");
+  const [fileError, setFileError] = useState("");
   const [saving, setSaving] = useState(false);
 
   function updateItem(key: string, patch: Partial<WorkItem>) {
@@ -82,17 +83,17 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
   function addFile(file: File | null) {
     setPickKey((value) => value + 1);
     if (!file) return;
-    const problem = fileProblem(file.type, file.size);
+    const problem = fileProblem(file.type, file.size, file.name);
     if (problem) {
-      setError(t(problem));
+      setFileError(t(problem));
       return;
     }
     const savedCount = files.filter((item) => item.reportId === savedId).length;
     if (savedCount + pending.length >= 10) {
-      setError(t("rep.fileLimit"));
+      setFileError(t("rep.fileLimit"));
       return;
     }
-    setError("");
+    setFileError("");
     setPending((current) => [...current, { key: crypto.randomUUID(), file }]);
   }
 
@@ -132,6 +133,12 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
     setSavedId(reportId);
     const token = await getToken();
     for (const item of pending) {
+      const problem = fileProblem(item.file.type, item.file.size, item.file.name);
+      if (problem) {
+        setSaving(false);
+        setFileError(t(problem));
+        return;
+      }
       const body = new FormData();
       body.set("token", token);
       body.set("purpose", "report");
@@ -142,7 +149,7 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
       const payload = (await response.json()) as { ok: boolean; error?: string };
       if (!payload.ok) {
         setSaving(false);
-        setError(t(payload.error ?? "auth.failed"));
+        setFileError(t(payload.error ?? "auth.failed"));
         return;
       }
       setPending((current) => current.filter((row) => row.key !== item.key));
@@ -153,6 +160,7 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
 
   return (
     <AppShell title={initial ? t("rep.edit") : t("rep.title")}>
+      <div className="rep">
       <Link href="/reports" className="back">
         <Icon name="chevl" className="icon icon--sm icon--flip" />
         <span>{t("rep.back")}</span>
@@ -243,9 +251,14 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
           <label className="file-pick">
             <span className="btn btn--secondary btn--sm">{t("hr.fileChoose")}</span>
             <span className="file-pick__name">{t("hr.fileNone")}</span>
-            <input key={pickKey} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => addFile(event.target.files?.[0] ?? null)} />
+            <input key={pickKey} type="file" accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => {
+              const next = event.target.files?.[0] ?? null;
+              event.currentTarget.value = "";
+              addFile(next);
+            }} />
           </label>
           <small className="muted">{t("hr.fileHint")} · {t("rep.fileLimit")}</small>
+          {fileError ? <p style={{ color: "var(--danger)" }}>{fileError}</p> : null}
           {saved.map((file) => (
             <SavedFile
               key={file.id}
@@ -268,6 +281,7 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
           <button type="submit" className="btn btn--primary" disabled={saving}>{initial ? t("set.save") : t("rep.submit")}</button>
         </div>
       </form>
+      </div>
     </AppShell>
   );
 }

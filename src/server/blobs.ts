@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { adminBucket } from "@/lib/firebase-admin";
-import { extensionFor, fileProblem, type StoredType } from "@/lib/files";
+import { extensionFor, fileProblem, resolveStoredType, type StoredType } from "@/lib/files";
 
 export async function savePrivateFile(folder: string, type: StoredType, bytes: Buffer) {
   const path = `${folder}/${randomUUID()}.${extensionFor(type)}`;
@@ -21,11 +21,12 @@ export async function signedReadUrl(path: string) {
 }
 
 export async function removePrivateFile(path: string) {
-  if (!path.startsWith("employees/") && !path.startsWith("hr-documents/") && !path.startsWith("project-reports/")) return;
+  if (!path.startsWith("employees/") && !path.startsWith("hr-documents/") && !path.startsWith("project-reports/") && !path.startsWith("library/")) return;
   await adminBucket().file(path).delete({ ignoreNotFound: true });
 }
 
-export function acceptedFile(type: string, size: number): StoredType | null {
-  if (fileProblem(type, size)) return null;
-  return type as StoredType;
+export function acceptedFile(type: string, size: number, name = ""): StoredType | null {
+  const stored = resolveStoredType(type, name);
+  if (!stored || fileProblem(type, size, name)) return null;
+  return stored;
 }

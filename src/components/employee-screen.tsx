@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
-import { FilePick } from "@/components/file-pick";
+import { FilePick, StoredPreview } from "@/components/file-pick";
 import { Icon } from "@/components/icon";
 import { useHr } from "@/components/use-hr";
 import { Modal, Toast } from "@/components/ui/overlay";
@@ -43,6 +43,7 @@ export function EmployeeScreen({ employeeId }: { employeeId: string }) {
 
   return (
     <AppShell title={person?.name ?? t("hr.title")}>
+      <div className="hr">
       <div className="page-header">
         <div>
           <Link href="/hr" className="link">{t("hr.back")}</Link>
@@ -93,29 +94,45 @@ export function EmployeeScreen({ employeeId }: { employeeId: string }) {
                   <tr key={item.id}>
                     <td data-label={t("hr.docTitle")} className="strong">{item.titleEn}</td>
                     <td data-label={t("hr.docTitleAr")}>{item.titleAr}</td>
-                    <td data-label={t("hr.file")} className="num muted">{formatBytes(item.size, locale)}</td>
+                    <td data-label={t("hr.file")}>
+                      <StoredPreview
+                        title={locale === "ar" ? item.titleAr || item.titleEn : item.titleEn}
+                        subtitle={formatBytes(item.size, locale)}
+                        contentType={item.contentType}
+                        previewKey={item.id}
+                        loadImage={async () => {
+                          const result = await openStoredFile(await getToken(), "employee", item.id);
+                          return result.ok ? result.url : "";
+                        }}
+                        onOpen={() => void openFile(item.id)}
+                        onRemove={canManage ? () => {
+                          void (async () => {
+                            const result = await deleteEmployeeFile(await getToken(), item.id);
+                            if (!result.ok) setError(t(result.error ?? "auth.failed"));
+                            else notify(t("hr.fileRemoved"), item.titleEn);
+                          })();
+                        } : undefined}
+                      />
+                    </td>
                     <td className="end" data-label="">
-                      <div className="hstack">
-                        <button type="button" className="btn btn--ghost btn--sm" onClick={() => void openFile(item.id)}>{t("hr.fileOpen")}</button>
-                        {canManage ? (
-                          <>
-                            <button type="button" className="btn btn--secondary btn--sm" onClick={() => { setAdding(false); setEditing(item); }}>{t("us.edit")}</button>
-                            <button
-                              type="button"
-                              className="btn btn--ghost btn--sm"
-                              onClick={() => {
-                                void (async () => {
-                                  const result = await deleteEmployeeFile(await getToken(), item.id);
-                                  if (!result.ok) setError(t(result.error ?? "auth.failed"));
-                                  else notify(t("hr.fileRemoved"), item.titleEn);
-                                })();
-                              }}
-                            >
-                              {t("us.delete")}
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
+                      {canManage ? (
+                        <div className="hstack">
+                          <button type="button" className="btn btn--secondary btn--sm" onClick={() => { setAdding(false); setEditing(item); }}>{t("us.edit")}</button>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => {
+                              void (async () => {
+                                const result = await deleteEmployeeFile(await getToken(), item.id);
+                                if (!result.ok) setError(t(result.error ?? "auth.failed"));
+                                else notify(t("hr.fileRemoved"), item.titleEn);
+                              })();
+                            }}
+                          >
+                            {t("us.delete")}
+                          </button>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -136,7 +153,7 @@ export function EmployeeScreen({ employeeId }: { employeeId: string }) {
             return "";
           }
           if (!file) return "hr.fileType";
-          const problem = fileProblem(file.type, file.size);
+          const problem = fileProblem(file.type, file.size, file.name);
           if (problem) return problem;
           const body = new FormData();
           body.set("token", await getToken());
@@ -154,6 +171,7 @@ export function EmployeeScreen({ employeeId }: { employeeId: string }) {
         }}
       />
       <Toast open={Boolean(toast)} title={toast?.title ?? ""} detail={toast?.detail ?? ""} />
+      </div>
     </AppShell>
   );
 }
@@ -214,6 +232,7 @@ function FileModal({
           hint={fileRecord ? `${t("hr.fileHint")} · ${t("hr.fileKeep")}` : t("hr.fileHint")}
           title={locale === "ar" ? titleAr || titleEn : titleEn || titleAr}
           file={file}
+          resetKey={`${open}:${fileRecord?.id ?? "new"}`}
           onChange={setFile}
         />
         {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}

@@ -11,11 +11,11 @@ import { Kpi } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/data";
 import { Modal, Toast } from "@/components/ui/overlay";
 import { departments, initials, type Department } from "@/lib/directory";
-import { FilePick } from "@/components/file-pick";
+import { FilePick, StoredPreview } from "@/components/file-pick";
 import { fileProblem } from "@/lib/files";
 import { Link } from "@/i18n/navigation";
 import { applicantStages, attendanceStatuses, currentMonthKey, hrDocStatuses, inclusiveDays, isPast, leaveKinds, positionOf, qatarToday, type ApplicantStage, type AttendanceStatus, type Employee, type HrDocStatus, type LeaveKind } from "@/lib/hr";
-import { createApplicant, createEmployee, createHrDocument, createJob, createLeaveRequest, deleteApplicant, deleteEmployee, deleteHrDocument, deleteJob, deleteLeaveRequest, openStoredFile, reviewLeave, saveTodayAttendance, sendAttendanceReport, updateApplicant, updateEmployee, updateHrDocument, updateJob, updateLeaveRequest } from "@/server/hr";
+import { clearHrDocumentFile, createApplicant, createEmployee, createHrDocument, createJob, createLeaveRequest, deleteApplicant, deleteEmployee, deleteHrDocument, deleteJob, deleteLeaveRequest, openStoredFile, reviewLeave, saveTodayAttendance, sendAttendanceReport, updateApplicant, updateEmployee, updateHrDocument, updateJob, updateLeaveRequest } from "@/server/hr";
 
 export function HrScreen() {
   const t = useTranslations();
@@ -74,13 +74,14 @@ export function HrScreen() {
 
   return (
     <AppShell title={t("hr.title")}>
+      <div className="hr">
       <div className="page-header">
         <div>
           <span className="eyebrow">{t("hr.eyebrow")}</span>
           <h2 className="page-title">{t("hr.title")}</h2>
           <p className="page-sub">{ready ? t("hr.count", { count: employees.length, departments: departmentCount }) : t("common.loading")}</p>
         </div>
-        <div className="hstack">
+        <div className="hstack page-actions">
           <button type="button" className="btn btn--secondary" onClick={() => exportEmployees(visible, locale, t)}>
             <Icon name="download" />
             {t("btn.export")}
@@ -126,7 +127,7 @@ export function HrScreen() {
               </button>
             </div>
           ) : null}
-          <label className="search" style={{ width: 320 }}>
+          <label className="search">
             <Icon name="search" className="icon icon--sm" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("hr.search")} />
           </label>
@@ -189,6 +190,7 @@ export function HrScreen() {
             }}
             onUpdate={async (id, titleEn, titleAr, status, expiresAt) => run(async () => updateHrDocument(await getToken(), id, { titleEn, titleAr, status, expiresAt }), t("hr.saved"), titleEn)}
             onDelete={(id) => void run(async () => deleteHrDocument(await getToken(), id), t("hr.docRemoved"), "")}
+            onClearFile={(id) => run(async () => clearHrDocumentFile(await getToken(), id), t("hr.fileRemoved"), "")}
             onOpenFile={(id) => void openRecord(id, "hr")}
             getToken={getToken}
           />
@@ -219,6 +221,7 @@ export function HrScreen() {
         }}
       />
       <Toast open={Boolean(toast)} title={toast?.title ?? ""} detail={toast?.detail ?? ""} />
+      </div>
     </AppShell>
   );
 }
@@ -823,6 +826,7 @@ function DocumentsPanel({
   onCreate,
   onUpdate,
   onDelete,
+  onClearFile,
   onOpenFile,
   getToken,
 }: {
@@ -832,6 +836,7 @@ function DocumentsPanel({
   onCreate: (titleEn: string, titleAr: string, status: HrDocStatus, expiresAt: string) => Promise<string>;
   onUpdate: (id: string, titleEn: string, titleAr: string, status: HrDocStatus, expiresAt: string) => Promise<boolean>;
   onDelete: (id: string) => void;
+  onClearFile: (id: string) => Promise<boolean>;
   onOpenFile: (id: string) => void;
   getToken: () => Promise<string>;
 }) {
@@ -843,12 +848,15 @@ function DocumentsPanel({
   const [status, setStatus] = useState<HrDocStatus>("draft");
   const [expiresAt, setExpiresAt] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [dropFile, setDropFile] = useState(false);
   const [error, setError] = useState("");
+  const editing = documents.find((item) => item.id === editingId) ?? null;
 
   function close() {
     setOpen(false);
     setEditingId("");
     setFile(null);
+    setDropFile(false);
     setError("");
   }
 
@@ -867,6 +875,7 @@ function DocumentsPanel({
               setStatus("draft");
               setExpiresAt("");
               setFile(null);
+              setDropFile(false);
               setError("");
               setOpen(true);
             }}
@@ -893,13 +902,27 @@ function DocumentsPanel({
               const expired = document.status === "expired" || isPast(document.expiresAt);
               return (
                 <tr key={document.id}>
-                  <td data-label={t("hr.docTitle")} className="strong">{document.titleEn}</td>
+                  <td data-label={t("hr.docTitle")}>
+                    <div className="strong">{document.titleEn}</div>
+                    {document.hasFile ? (
+                      <StoredPreview
+                        title={locale === "ar" ? document.titleAr || document.titleEn : document.titleEn}
+                        contentType={document.contentType}
+                        previewKey={document.id}
+                        loadImage={async () => {
+                          const result = await openStoredFile(await getToken(), "hr", document.id);
+                          return result.ok ? result.url : "";
+                        }}
+                        onOpen={() => onOpenFile(document.id)}
+                        onRemove={canManage ? () => void onClearFile(document.id) : undefined}
+                      />
+                    ) : null}
+                  </td>
                   <td data-label={t("hr.docTitleAr")}>{document.titleAr}</td>
                   <td data-label={t("col.status")}>{expired ? t("ds.expired") : t(`ds.${document.status}`)}</td>
                   <td data-label={t("hr.expires")} className="num muted">{document.expiresAt || t("time.none")}</td>
                   <td className="end" data-label="">
                     <div className="hstack">
-                      {document.hasFile ? <button type="button" className="btn btn--ghost btn--sm" onClick={() => onOpenFile(document.id)}>{t("hr.fileOpen")}</button> : null}
                       {canManage ? (
                         <>
                           <button
@@ -912,6 +935,7 @@ function DocumentsPanel({
                               setStatus(document.status);
                               setExpiresAt(document.expiresAt);
                               setFile(null);
+                              setDropFile(false);
                               setError("");
                               setOpen(true);
                             }}
@@ -935,7 +959,7 @@ function DocumentsPanel({
           onSubmit={(event) => {
             event.preventDefault();
             if (file) {
-              const problem = fileProblem(file.type, file.size);
+              const problem = fileProblem(file.type, file.size, file.name);
               if (problem) {
                 setError(t(problem));
                 return;
@@ -947,6 +971,10 @@ function DocumentsPanel({
               if (editingId) {
                 const ok = await onUpdate(editingId, titleEn, titleAr, status, expiresAt);
                 if (!ok) return;
+              }
+              if (dropFile && !file) {
+                const cleared = await onClearFile(id);
+                if (!cleared) return;
               }
               if (file) {
                 const body = new FormData();
@@ -974,12 +1002,29 @@ function DocumentsPanel({
             </select>
           </div>
           <Field label={t("hr.expires")} value={expiresAt} onChange={setExpiresAt} type="date" />
+          {editing && editing.hasFile && !file && !dropFile ? (
+            <StoredPreview
+              title={locale === "ar" ? editing.titleAr || editing.titleEn : editing.titleEn}
+              contentType={editing.contentType}
+              previewKey={editing.id}
+              loadImage={async () => {
+                const result = await openStoredFile(await getToken(), "hr", editing.id);
+                return result.ok ? result.url : "";
+              }}
+              onOpen={() => onOpenFile(editing.id)}
+              onRemove={() => setDropFile(true)}
+            />
+          ) : null}
           <FilePick
             label={t("hr.file")}
-            hint={editingId ? `${t("hr.fileHint")} · ${t("hr.fileKeep")}` : t("hr.fileHint")}
+            hint={editingId && !dropFile ? `${t("hr.fileHint")} · ${t("hr.fileKeep")}` : t("hr.fileHint")}
             title={locale === "ar" ? titleAr || titleEn : titleEn || titleAr}
             file={file}
-            onChange={setFile}
+            resetKey={`${open}:${editingId}:${dropFile}`}
+            onChange={(next) => {
+              setFile(next);
+              if (next) setDropFile(false);
+            }}
           />
           {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
           <div className="hstack" style={{ justifyContent: "flex-end" }}>

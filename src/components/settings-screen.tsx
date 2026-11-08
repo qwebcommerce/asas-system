@@ -19,8 +19,6 @@ type SettingsDraft = {
   email: string;
   mobile: string;
   employeeId: string;
-  twoFactor: boolean;
-  signInAlerts: boolean;
   theme: "light" | "dark";
 };
 
@@ -47,8 +45,6 @@ export function SettingsScreen() {
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
   const [employeeId, setEmployeeId] = useState("");
-  const [twoFactor, setTwoFactor] = useState(true);
-  const [signInAlerts, setSignInAlerts] = useState(true);
   const [toast, setToast] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -65,8 +61,6 @@ export function SettingsScreen() {
       setEmail(draft.email);
       setMobile(draft.mobile);
       setEmployeeId(draft.employeeId);
-      setTwoFactor(draft.twoFactor);
-      setSignInAlerts(draft.signInAlerts);
       setLocalTheme(draft.theme);
       setTheme(draft.theme);
       return;
@@ -75,8 +69,6 @@ export function SettingsScreen() {
     setEmail(profile.email);
     setMobile(profile.mobile);
     setEmployeeId(profile.employeeId);
-    setTwoFactor(profile.twoFactor);
-    setSignInAlerts(profile.signInAlerts);
     if (profile.theme) setLocalTheme(profile.theme);
   }, [profile]);
 
@@ -86,8 +78,6 @@ export function SettingsScreen() {
       email,
       mobile,
       employeeId,
-      twoFactor,
-      signInAlerts,
       theme,
       ...next,
     };
@@ -99,8 +89,6 @@ export function SettingsScreen() {
     if ("email" in next && next.email !== undefined) setEmail(next.email);
     if ("mobile" in next && next.mobile !== undefined) setMobile(next.mobile);
     if ("employeeId" in next && next.employeeId !== undefined) setEmployeeId(next.employeeId);
-    if ("twoFactor" in next && next.twoFactor !== undefined) setTwoFactor(next.twoFactor);
-    if ("signInAlerts" in next && next.signInAlerts !== undefined) setSignInAlerts(next.signInAlerts);
     if (next.theme) {
       setTheme(next.theme);
       setLocalTheme(next.theme);
@@ -122,8 +110,6 @@ export function SettingsScreen() {
     setEmail(profile.email);
     setMobile(profile.mobile);
     setEmployeeId(profile.employeeId);
-    setTwoFactor(profile.twoFactor);
-    setSignInAlerts(profile.signInAlerts);
     setError("");
     sessionStorage.removeItem(DRAFT_KEY);
     const savedTheme = profile.theme ?? (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
@@ -141,8 +127,8 @@ export function SettingsScreen() {
       email,
       mobile,
       employeeId,
-      twoFactor,
-      signInAlerts,
+      twoFactor: profile.twoFactor,
+      signInAlerts: profile.signInAlerts,
       locale: locale === "ar" ? "ar" : "en",
       theme,
     });
@@ -193,11 +179,6 @@ export function SettingsScreen() {
               <Field label={t("reg.empId")} value={employeeId} onChange={(value) => edit({ employeeId: value })} />
             </div>
           </div>
-          <div className="card stack">
-            <h3 className="card-title">{t("set.security")}</h3>
-            <Toggle title={t("set.2fa")} detail={t("set.2fas")} checked={twoFactor} onChange={(value) => edit({ twoFactor: value })} />
-            <Toggle title={t("set.alerts")} detail={t("set.alertss")} checked={signInAlerts} onChange={(value) => edit({ signInAlerts: value })} />
-          </div>
         </div>
         <div className="stack">
           <div className="card stack stack--sm">
@@ -239,21 +220,6 @@ function Field({ label, value, onChange, type = "text" }: { label: string; value
     <div className="field">
       <label><span>{label}</span></label>
       <input className="input" type={type} value={value} onChange={(event) => onChange(event.target.value)} />
-    </div>
-  );
-}
-
-function Toggle({ title, detail, checked, onChange }: { title: string; detail: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return (
-    <div className="between">
-      <div>
-        <b>{title}</b>
-        <small className="muted" style={{ display: "block" }}>{detail}</small>
-      </div>
-      <label className="switch">
-        <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-        <span />
-      </label>
     </div>
   );
 }

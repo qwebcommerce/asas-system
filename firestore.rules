@@ -106,8 +106,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /libraryDocuments/{id} {
+      allow read: if signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && ownUser().status != "disabled";
+      allow write: if false;
+    }
+
     match /reportFiles/{id} {
       allow read: if isAdmin() || activeRole("engineer") || activeRole("accountant");
+      allow write: if false;
+    }
+
+    match /payrollRuns/{id} {
+      allow read: if isAdmin() || activeRole("accountant") || activeRole("hr");
       allow write: if false;
     }
 

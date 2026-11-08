@@ -562,9 +562,26 @@ export async function deleteHrDocument(idToken: string, documentId: string): Pro
     const snap = await ref.get();
     if (!snap.exists) return { ok: false, error: "us.invalid" };
     const path = typeof snap.data()?.storagePath === "string" ? snap.data()?.storagePath : "";
-    await ref.delete();
     if (path) await removePrivateFile(path);
+    await ref.delete();
     await audit("hr.document.delete", who.uid, documentId, "");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "auth.failed" };
+  }
+}
+
+export async function clearHrDocumentFile(idToken: string, documentId: string): Promise<ActionResult> {
+  try {
+    const who = await manager(idToken);
+    if ("error" in who) return { ok: false, error: who.error };
+    const ref = adminDb().collection("hrDocuments").doc(documentId);
+    const snap = await ref.get();
+    if (!snap.exists) return { ok: false, error: "us.invalid" };
+    const path = typeof snap.data()?.storagePath === "string" ? snap.data()?.storagePath : "";
+    await ref.update({ storagePath: "", contentType: "", size: 0 });
+    if (path) await removePrivateFile(path);
+    await audit("hr.document.file.delete", who.uid, documentId, "");
     return { ok: true };
   } catch {
     return { ok: false, error: "auth.failed" };
@@ -597,8 +614,8 @@ export async function deleteEmployeeFile(idToken: string, fileId: string): Promi
     const snap = await ref.get();
     if (!snap.exists) return { ok: false, error: "us.invalid" };
     const path = typeof snap.data()?.storagePath === "string" ? snap.data()?.storagePath : "";
-    await ref.delete();
     if (path) await removePrivateFile(path);
+    await ref.delete();
     await audit("hr.file.delete", who.uid, fileId, "");
     return { ok: true };
   } catch {

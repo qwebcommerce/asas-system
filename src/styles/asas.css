@@ -171,6 +171,11 @@ img, svg { display: block; max-width: 100%; }
 }
 [dir="rtl"] .nav-item[aria-current="page"] { box-shadow: inset -3px 0 0 var(--champagne); }
 .nav-item[aria-current="page"] .icon { stroke: var(--champagne); }
+.nav-count {
+  margin-inline-start: auto; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+  display: grid; place-items: center; background: #2C2C2C; color: var(--steel); font-size: 12px; font-weight: 600;
+}
+.nav-count.is-live { background: var(--champagne); color: var(--onyx); }
 .sidebar .spacer { flex: 1; }
 .me { display: flex; align-items: center; gap: 12px; padding: 14px 12px 0; border-top: 1px solid #2C2C2C; margin-top: 12px; }
 .me .avatar { background: var(--graphite); color: var(--mist); }
@@ -375,7 +380,7 @@ img, svg { display: block; max-width: 100%; }
   clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 .file-pick__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
-.file-chip { display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.file-chip { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .file-chip .grow { min-width: 0; }
 .file-chip .grow b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-chip__thumb { width: 44px; height: 44px; flex: none; border-radius: 8px; object-fit: cover; background: var(--surface-2); }
@@ -559,6 +564,62 @@ img, svg { display: block; max-width: 100%; }
   .banner > .grow, #pending > .grow { flex: 1 1 calc(100% - 72px); min-width: 0; }
   .banner > .btn { width: 100%; }
   .topbar [data-theme-toggle] { display: none; }
+}
+
+/* HR stays readable from a wide desktop down to a phone, in both directions. */
+:is(.hr, .rep, .docs, .pay) { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+:is(.hr, .rep, .docs, .pay) .page-title, :is(.hr, .rep, .docs, .pay) .kpi .label, :is(.hr, .rep, .docs, .pay) .kpi .note, :is(.hr, .rep, .docs, .pay) .kv b { overflow-wrap: anywhere; }
+:is(.hr, .rep, .docs, .pay) .search { width: min(320px, 100%); }
+:is(.hr, .rep, .docs, .pay) .tabs { display: flex; width: max-content; max-width: 100%; }
+:is(.hr, .rep, .docs, .pay) .tab { flex: none; }
+:is(.hr, .rep, .docs, .pay) .between { flex-wrap: wrap; }
+:is(.hr, .rep, .docs, .pay) .file-chip { max-width: 100%; }
+.docs-nav { width: 220px; flex: none; }
+@media (max-width: 1024px) {
+  .docs-nav { width: 100%; flex-direction: row; overflow-x: auto; }
+  .docs-nav .nav-item { flex: none; }
+}
+:is(.hr, .rep, .docs, .pay) .modal .hstack { width: 100%; }
+@media (max-width: 1024px) {
+  :is(.hr, .rep, .docs, .pay) { gap: 14px; }
+  :is(.hr, .rep, .docs, .pay) .search { width: 100%; }
+  :is(.hr, .rep, .docs, .pay) .page-actions { width: 100%; }
+  :is(.hr, .rep, .docs, .pay) .between > .hstack { width: 100%; }
+  :is(.hr, .rep, .docs, .pay) .table--cards thead { display: none; }
+  :is(.hr, .rep, .docs, .pay) .table--cards, :is(.hr, .rep, .docs, .pay) .table--cards tbody, :is(.hr, .rep, .docs, .pay) .table--cards tr, :is(.hr, .rep, .docs, .pay) .table--cards td { display: block; width: 100%; }
+  :is(.hr, .rep, .docs, .pay) .card--flush.table-wrap:not(:has(.between)) { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+  :is(.hr, .rep, .docs, .pay) .card--flush.table-wrap:has(.between),
+  :is(.hr, .rep, .docs, .pay) .card > .table-wrap { padding: 0 12px 12px; overflow: visible; }
+  :is(.hr, .rep, .docs, .pay) .table--cards tr { border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; margin: 0 0 10px; width: auto; background: var(--surface); }
+  :is(.hr, .rep, .docs, .pay) .table--cards td { border: 0; padding: 6px 0; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 12px; text-align: end; min-width: 0; }
+  :is(.hr, .rep, .docs, .pay) .table--cards td:first-child { justify-content: flex-start; text-align: start; }
+  :is(.hr, .rep, .docs, .pay) .table--cards td::before { flex: none; padding-top: 2px; }
+  :is(.hr, .rep, .docs, .pay) .table--cards td > .file-chip,
+  :is(.hr, .rep, .docs, .pay) .table--cards td > .hstack,
+  :is(.hr, .rep, .docs, .pay) .table--cards td > .select,
+  :is(.hr, .rep, .docs, .pay) .table--cards td > .input { flex: 1 1 100%; width: 100%; max-width: 100%; margin-top: 4px; }
+  :is(.hr, .rep, .docs, .pay) .card > .hstack .btn { flex: 1; }
+  :is(.hr, .rep, .docs, .pay) .table--cards td > .hstack { justify-content: flex-start; }
+  :is(.hr, .rep, .docs, .pay) .table--cards td[data-label=""] > .hstack { justify-content: flex-end; }
+  :is(.hr, .rep, .docs, .pay) .table--cards .person { min-width: 0; flex: 1; }
+  :is(.hr, .rep, .docs, .pay) .table--cards .person b { overflow-wrap: anywhere; }
+  :is(.hr, .rep, .docs, .pay) .ai { flex-wrap: wrap; align-items: flex-start; }
+  :is(.hr, .rep, .docs, .pay) .ai > .grow { min-width: 0; flex: 1 1 calc(100% - 36px); }
+  :is(.hr, .rep, .docs, .pay) .ai > .btn { width: 100%; }
+  :is(.hr, .rep, .docs, .pay) .modal .hstack .btn { flex: 1; }
+}
+@media (max-width: 720px) {
+  :is(.hr, .rep, .docs, .pay) .page-header .hstack .btn--secondary { display: inline-flex; }
+  :is(.hr, .rep, .docs, .pay) .page-actions .btn { flex: 1 1 auto; }
+  :is(.hr, .rep, .docs, .pay) .grid-5 { grid-template-columns: 1fr; }
+}
+.pay td .input, .pay td .select { width: 8.5rem; }
+.ntf { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.ntf .list-row { align-items: flex-start; }
+.ntf .list-row .grow { min-width: 0; }
+@media (max-width: 720px) {
+  .ntf .list-row { flex-wrap: wrap; }
+  .ntf .list-row .btn { margin-inline-start: auto; }
 }
 
 .nav-item { position: relative; overflow: hidden; }

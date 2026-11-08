@@ -1,7 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
-import { fileProblem, type StoredType } from "@/lib/files";
+import { fileProblem } from "@/lib/files";
 import { adminDb } from "@/lib/firebase-admin";
-import { removePrivateFile, savePrivateFile } from "@/server/blobs";
+import { acceptedFile, removePrivateFile, savePrivateFile } from "@/server/blobs";
 import { actor, audit, canManageHr, canManageReports } from "@/server/session";
 
 export const instant = false;
@@ -18,15 +18,16 @@ export async function POST(request: Request) {
     const purpose = text(form.get("purpose"));
     if (purpose === "report") {
       if (!canManageReports(who.role)) return Response.json({ ok: false, error: "rep.forbidden" });
+    } else if (purpose === "library") {
+      // Any active user may attach a file to a document they created. Ownership is checked below.
     } else if (!canManageHr(who.role)) {
       return Response.json({ ok: false, error: "hr.forbidden" });
     }
     const file = form.get("file");
     if (!(file instanceof File)) return Response.json({ ok: false, error: "hr.fileType" });
-    const problem = fileProblem(file.type, file.size);
-    if (problem) return Response.json({ ok: false, error: problem });
+    const type = acceptedFile(file.type, file.size, file.name);
+    if (!type) return Response.json({ ok: false, error: fileProblem(file.type, file.size, file.name) ?? "hr.fileType" });
     const bytes = Buffer.from(await file.arrayBuffer());
-    const type = file.type as StoredType;
 
     if (purpose === "employee" || purpose === "employee-update") {
       const employeeId = text(form.get("employeeId"));
@@ -74,6 +75,23 @@ export async function POST(request: Request) {
       await ref.update({ storagePath, contentType: type, size: file.size });
       if (previous) await removePrivateFile(previous);
       await audit("hr.document.file", who.uid, documentId, type);
+      return Response.json({ ok: true, id: documentId });
+    }
+
+    if (purpose === "library") {
+      const documentId = text(form.get("documentId"));
+      const ref = adminDb().collection("libraryDocuments").doc(documentId);
+      const snap = await ref.get();
+      const owner = typeof snap.data()?.createdBy === "string" ? snap.data()?.createdBy : "";
+      if (!documentId || !snap.exists || (who.role !== "superAdmin" && owner !== who.uid)) {
+        return Response.json({ ok: false, error: "doc.forbidden" });
+      }
+      const previous = typeof snap.data()?.storagePath === "string" ? snap.data()?.storagePath : "";
+      const storagePath = await savePrivateFile(`library/${documentId}`, type, bytes);
+      const version = typeof snap.data()?.version === "number" ? snap.data()?.version : 1;
+      await ref.update({ storagePath, contentType: type, size: file.size, version: previous ? version + 1 : version });
+      if (previous) await removePrivateFile(previous);
+      await audit("documents.file", who.uid, documentId, type);
       return Response.json({ ok: true, id: documentId });
     }
 

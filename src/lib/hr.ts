@@ -65,6 +65,7 @@ export type HrDocument = {
   status: HrDocStatus;
   expiresAt: string;
   hasFile: boolean;
+  contentType: string;
 };
 
 export type EmployeeFile = {
@@ -172,7 +173,15 @@ export function mapApplicant(id: string, data: Record<string, unknown>): Applica
 export function mapHrDocument(id: string, data: Record<string, unknown>): HrDocument | null {
   const status = hrDocStatuses.find((item) => item === data.status) ?? "draft";
   if (!text(data.titleEn)) return null;
-  return { id, titleEn: text(data.titleEn), titleAr: text(data.titleAr), status, expiresAt: day(data.expiresAt), hasFile: text(data.storagePath).length > 0 };
+  return {
+    id,
+    titleEn: text(data.titleEn),
+    titleAr: text(data.titleAr),
+    status,
+    expiresAt: day(data.expiresAt),
+    hasFile: text(data.storagePath).length > 0,
+    contentType: text(data.contentType),
+  };
 }
 
 export function mapEmployeeFile(id: string, data: Record<string, unknown>): EmployeeFile | null {

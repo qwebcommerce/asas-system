@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ReportForm } from "@/components/report-form";
+import { ReportView } from "@/components/report-view";
 
 export const instant = false;
 
@@ -13,5 +13,5 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function EditReportPage({ params }: { params: Promise<{ locale: string; reportId: string }> }) {
   const { locale, reportId } = await params;
   setRequestLocale(locale);
-  return <ReportForm reportId={reportId} />;
+  return <ReportView reportId={reportId} />;
 }

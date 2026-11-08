@@ -10,10 +10,22 @@ const limits = {
 
 export type StoredType = keyof typeof limits;
 
-export function fileProblem(type: string, size: number) {
-  const limit = limits[type as StoredType];
-  if (!limit) return "hr.fileType" as const;
-  if (!Number.isFinite(size) || size <= 0 || size > limit) return "hr.fileSize" as const;
+export function resolveStoredType(type: string, name = ""): StoredType | null {
+  if (type === "image/jpg") return "image/jpeg";
+  if (type in limits) return type as StoredType;
+  if (type && type !== "application/octet-stream" && type !== "binary/octet-stream") return null;
+  const extension = name.split(".").pop()?.toLowerCase() ?? "";
+  if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
+  if (extension === "png") return "image/png";
+  if (extension === "webp") return "image/webp";
+  if (extension === "pdf") return "application/pdf";
+  return null;
+}
+
+export function fileProblem(type: string, size: number, name = "") {
+  const stored = resolveStoredType(type, name);
+  if (!stored) return "hr.fileType" as const;
+  if (!Number.isFinite(size) || size <= 0 || size > limits[stored]) return "hr.fileSize" as const;
   return null;
 }
 

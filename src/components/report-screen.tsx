@@ -22,6 +22,7 @@ export function ReportScreen() {
 
   return (
     <AppShell title={t("nav.reports")}>
+      <div className="rep">
       <div className="page-header">
         <div>
           <span className="eyebrow">{t("nav.reports")}</span>
@@ -29,10 +30,12 @@ export function ReportScreen() {
           <p className="page-sub">{ready ? t("rep.count", { count: reports.length }) : t("common.loading")}</p>
         </div>
         {canManage ? (
-          <Link href="/reports/new" className="btn btn--primary">
-            <Icon name="plus" />
-            {t("rep.new")}
-          </Link>
+          <div className="hstack page-actions">
+            <Link href="/reports/new" className="btn btn--primary">
+              <Icon name="plus" />
+              {t("rep.new")}
+            </Link>
+          </div>
         ) : null}
       </div>
       {!canView ? <p className="muted">{t("rep.forbidden")}</p> : null}
@@ -46,11 +49,11 @@ export function ReportScreen() {
                 <th>{t("rep.project")}</th>
                 <th>{t("rep.service")}</th>
                 <th>{t("rep.progress")}</th>
-                {canManage ? <th /> : null}
+                <th />
               </tr>
             </thead>
             <tbody>
-              {ordered.length === 0 ? <tr><td colSpan={canManage ? 5 : 4}>{ready ? t("rep.empty") : t("common.loading")}</td></tr> : null}
+              {ordered.length === 0 ? <tr><td colSpan={5}>{ready ? t("rep.empty") : t("common.loading")}</td></tr> : null}
               {ordered.map((report) => (
                 <tr key={report.id}>
                   <td data-label={t("rep.date")} className="num">{formatDay(report.date, locale)}</td>
@@ -60,10 +63,12 @@ export function ReportScreen() {
                   </td>
                   <td data-label={t("rep.service")}>{t(`svc.${report.service}`)}</td>
                   <td data-label={t("rep.progress")} className="num"><bdi>{report.progress}%</bdi></td>
-                  {canManage ? (
-                    <td className="end" data-label="">
-                      <div className="hstack">
-                        <Link href={`/reports/${report.id}`} className="btn btn--secondary btn--sm">{t("us.edit")}</Link>
+                  <td className="end" data-label="">
+                    <div className="hstack">
+                      <Link href={`/reports/${report.id}`} className="btn btn--secondary btn--sm">{t("rep.view")}</Link>
+                      {canManage ? (
+                        <>
+                        <Link href={`/reports/${report.id}/edit`} className="btn btn--secondary btn--sm">{t("us.edit")}</Link>
                         <button
                           type="button"
                           className="btn btn--ghost btn--sm"
@@ -82,9 +87,10 @@ export function ReportScreen() {
                         >
                           {t("us.delete")}
                         </button>
-                      </div>
-                    </td>
-                  ) : null}
+                        </>
+                      ) : null}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -92,6 +98,7 @@ export function ReportScreen() {
         </div>
       ) : null}
       <Toast open={Boolean(toast)} title={toast?.title ?? ""} detail={toast?.detail ?? ""} />
+      </div>
     </AppShell>
   );
 }
