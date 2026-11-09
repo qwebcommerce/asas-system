@@ -6,7 +6,9 @@ import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
 import { LanguageSwitch } from "@/components/language-switch";
 import { ThemeToggle } from "@/components/theme";
+import { usePermissions } from "@/components/permissions-provider";
 import { useDocuments } from "@/components/use-documents";
+import { moduleVisible, type MatrixModule } from "@/lib/access";
 import { initials } from "@/lib/directory";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 
@@ -32,7 +34,8 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const { ready, configured, user, profile, signOutUser } = useAuth();
-  const { expiring } = useDocuments();
+  const { expiring, canView: canViewDocuments } = useDocuments();
+  const { level } = usePermissions();
   const [menuOpen, setMenuOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
 
@@ -65,7 +68,7 @@ export function AppShell({
           </div>
           <div className="nav-label">{t("nav.workspace")}</div>
           <nav>
-            {workspace.map((item) => (
+            {workspace.filter((item) => item.id === "overview" || moduleVisible(item.id as MatrixModule, level(item.id as MatrixModule))).map((item) => (
               <NavItem
                 key={item.id}
                 href={item.href}
@@ -75,14 +78,16 @@ export function AppShell({
                 onNavigate={() => setMenuOpen(false)}
               />
             ))}
-            <NavItem
-              href="/notifications"
-              icon="bell"
-              label={t("nav.notifications")}
-              count={expiring.length}
-              active={pathname === "/notifications" || pathname.startsWith("/notifications/")}
-              onNavigate={() => setMenuOpen(false)}
-            />
+            {canViewDocuments ? (
+              <NavItem
+                href="/notifications"
+                icon="bell"
+                label={t("nav.notifications")}
+                count={expiring.length}
+                active={pathname === "/notifications" || pathname.startsWith("/notifications/")}
+                onNavigate={() => setMenuOpen(false)}
+              />
+            ) : null}
           </nav>
           <div className="nav-label">{t("nav.assist")}</div>
           <button type="button" className="nav-item" onClick={() => setAiOpen(true)}>
@@ -141,10 +146,12 @@ export function AppShell({
             >
               <Icon name="spark" />
             </button>
-            <Link href="/notifications" className="icon-btn" aria-label={t("top.notifications")}>
-              <Icon name="bell" />
-              {expiring.length > 0 ? <span className="dot" /> : null}
-            </Link>
+            {canViewDocuments ? (
+              <Link href="/notifications" className="icon-btn" aria-label={t("top.notifications")}>
+                <Icon name="bell" />
+                {expiring.length > 0 ? <span className="dot" /> : null}
+              </Link>
+            ) : null}
           </header>
           <main className="content">{children}</main>
         </div>

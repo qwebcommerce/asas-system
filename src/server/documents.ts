@@ -5,7 +5,8 @@ import type { ActionResult } from "@/lib/directory";
 import { documentKinds, type LibraryDocumentInput } from "@/lib/documents";
 import { adminDb } from "@/lib/firebase-admin";
 import { removePrivateFile, signedReadUrl } from "@/server/blobs";
-import { actor, audit } from "@/server/session";
+import { canReadAll, canWriteModule, seesOwn } from "@/lib/access";
+import { actor, audit, type Gate } from "@/server/session";
 
 function clean(input: LibraryDocumentInput): LibraryDocumentInput | null {
   const titleEn = input.titleEn.trim().slice(0, 160);
@@ -22,13 +23,25 @@ async function reader(idToken: string) {
   return actor(idToken);
 }
 
+function canEditDocument(who: Gate, owner: string) {
+  const level = who.level("documents");
+  if (canWriteModule(level)) return true;
+  return seesOwn(level) && owner === who.uid;
+}
+
+function canReadDocument(who: Gate, owner: string) {
+  const level = who.level("documents");
+  if (canReadAll(level)) return true;
+  return seesOwn(level) && owner === who.uid;
+}
+
 async function editable(idToken: string, documentId: string) {
   const who = await actor(idToken);
   if ("error" in who) return who;
   const snap = await adminDb().collection("libraryDocuments").doc(documentId).get();
   if (!snap.exists) return { error: "us.invalid" as const };
   const owner = typeof snap.data()?.createdBy === "string" ? snap.data()?.createdBy : "";
-  if (who.role !== "superAdmin" && owner !== who.uid) return { error: "doc.forbidden" as const };
+  if (!canEditDocument(who, owner)) return { error: "doc.forbidden" as const };
   return { who, snap };
 }
 
@@ -36,6 +49,7 @@ export async function createLibraryDocument(idToken: string, input: LibraryDocum
   try {
     const who = await reader(idToken);
     if ("error" in who) return { ok: false, error: who.error };
+    if (!canEditDocument(who, who.uid)) return { ok: false, error: "doc.forbidden" };
     const document = clean(input);
     if (!document) return { ok: false, error: "us.invalid" };
     const ref = await adminDb().collection("libraryDocuments").add({
@@ -101,6 +115,8 @@ export async function openLibraryFile(idToken: string, documentId: string): Prom
     const who = await reader(idToken);
     if ("error" in who) return { ok: false, error: who.error };
     const snap = await adminDb().collection("libraryDocuments").doc(documentId).get();
+    const owner = typeof snap.data()?.createdBy === "string" ? snap.data()?.createdBy : "";
+    if (!snap.exists || !canReadDocument(who, owner)) return { ok: false, error: "doc.forbidden" };
     const path = snap.data()?.storagePath;
     if (!snap.exists || typeof path !== "string" || !path.startsWith("library/")) return { ok: false, error: "us.invalid" };
     return { ok: true, url: await signedReadUrl(path) };

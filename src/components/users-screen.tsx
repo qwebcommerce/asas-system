@@ -9,7 +9,8 @@ import { useAccessAdmin } from "@/components/use-access";
 import { useDirectory } from "@/components/use-directory";
 import { Tabs } from "@/components/ui/data";
 import { Modal, Toast } from "@/components/ui/overlay";
-import { isLockedRole, levelKey, matrixModules, matrixRoles, moduleKey, permissionLevels, type MatrixRole, type PermissionLevel, type RoleMatrix } from "@/lib/access";
+import { canReadAll, canWriteModule, isLockedRole, levelKey, matrixModules, matrixRoles, moduleKey, permissionLevels, type MatrixRole, type PermissionLevel, type RoleMatrix } from "@/lib/access";
+import { usePermissions } from "@/components/permissions-provider";
 import { departments, initials, roles, type Department, type DirectoryUser, type Role } from "@/lib/directory";
 import { saveRoleMatrix } from "@/server/access";
 import { createDirectoryUser, deleteDirectoryUser, setUsersDisabled, updateDirectoryUser } from "@/server/directory";
@@ -18,6 +19,9 @@ export function UsersScreen() {
   const t = useTranslations();
   const locale = useLocale();
   const { profile, getToken } = useAuth();
+  const { ready: accessReady, level } = usePermissions();
+  const usersLevel = level("users");
+  const admin = canWriteModule(usersLevel);
   const { users, ready } = useDirectory();
   const { matrix } = useAccessAdmin(profile?.role === "superAdmin");
   const [tab, setTab] = useState("users");
@@ -29,7 +33,6 @@ export function UsersScreen() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [toast, setToast] = useState<{ title: string; detail: string } | null>(null);
   const [error, setError] = useState("");
-  const admin = profile?.role === "superAdmin";
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -59,10 +62,17 @@ export function UsersScreen() {
     return true;
   }
 
-  if (!admin) {
+  if (!accessReady) {
     return (
       <AppShell title={t("nav.users")}>
-        <p className="muted">{t("us.forbidden")}</p>
+        <p className="muted">{t("common.loading")}</p>
+      </AppShell>
+    );
+  }
+  if (!canReadAll(usersLevel)) {
+    return (
+      <AppShell title={t("nav.users")}>
+        <p className="muted">{t("common.forbidden")}</p>
       </AppShell>
     );
   }
@@ -80,10 +90,12 @@ export function UsersScreen() {
             <Icon name="download" />
             {t("btn.export")}
           </button>
-          <button type="button" className="btn btn--primary" onClick={() => setInviteOpen(true)}>
-            <Icon name="plus" />
-            {t("us.invite")}
-          </button>
+          {admin ? (
+            <button type="button" className="btn btn--primary" onClick={() => setInviteOpen(true)}>
+              <Icon name="plus" />
+              {t("us.invite")}
+            </button>
+          ) : null}
         </div>
       </div>
       <Tabs
@@ -91,7 +103,7 @@ export function UsersScreen() {
         onChange={setTab}
         items={[
           { id: "users", label: t("ut.users") },
-          { id: "roles", label: t("ut.roles") },
+          ...(profile?.role === "superAdmin" ? [{ id: "roles", label: t("ut.roles") }] : []),
         ]}
       />
       {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
@@ -115,7 +127,7 @@ export function UsersScreen() {
               ))}
             </select>
           </div>
-          {selected.size > 0 ? (
+          {admin && selected.size > 0 ? (
             <div className="bulk">
               <span className="check">
                 <span>{t("us.selectedCount", { count: selected.size })}</span>
@@ -170,6 +182,7 @@ export function UsersScreen() {
                     <tr key={person.id} className={isSelected ? "is-selected" : undefined}>
                       <td data-label="">
                         <div className="person">
+                          {admin ? (
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -184,6 +197,7 @@ export function UsersScreen() {
                               });
                             }}
                           />
+                          ) : null}
                           <span className="avatar">{initials(person.name)}</span>
                           <div>
                             <b>{person.name}</b>
@@ -206,7 +220,7 @@ export function UsersScreen() {
                         {formatActive(person.lastActiveAt, locale, t("time.none"))}
                       </td>
                       <td className="end" data-label="">
-                        {locked ? null : (
+                        {!admin || locked ? null : (
                           <div className="hstack">
                             <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditing(person)}>{t("us.edit")}</button>
                             <button

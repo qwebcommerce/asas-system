@@ -2,7 +2,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { fileProblem } from "@/lib/files";
 import { adminDb } from "@/lib/firebase-admin";
 import { acceptedFile, removePrivateFile, savePrivateFile } from "@/server/blobs";
-import { actor, audit, canManageHr, canManageReports } from "@/server/session";
+import { canWriteModule, seesOwn } from "@/lib/access";
+import { actor, audit } from "@/server/session";
 
 export const instant = false;
 
@@ -17,10 +18,12 @@ export async function POST(request: Request) {
     if ("error" in who) return Response.json({ ok: false, error: who.error });
     const purpose = text(form.get("purpose"));
     if (purpose === "report") {
-      if (!canManageReports(who.role)) return Response.json({ ok: false, error: "rep.forbidden" });
+      const level = who.level("reports");
+      if (!canWriteModule(level) && !seesOwn(level)) return Response.json({ ok: false, error: "rep.forbidden" });
     } else if (purpose === "library") {
-      // Any active user may attach a file to a document they created. Ownership is checked below.
-    } else if (!canManageHr(who.role)) {
+      const level = who.level("documents");
+      if (!canWriteModule(level) && !seesOwn(level)) return Response.json({ ok: false, error: "doc.forbidden" });
+    } else if (!canWriteModule(who.level("hr"))) {
       return Response.json({ ok: false, error: "hr.forbidden" });
     }
     const file = form.get("file");
@@ -83,7 +86,9 @@ export async function POST(request: Request) {
       const ref = adminDb().collection("libraryDocuments").doc(documentId);
       const snap = await ref.get();
       const owner = typeof snap.data()?.createdBy === "string" ? snap.data()?.createdBy : "";
-      if (!documentId || !snap.exists || (who.role !== "superAdmin" && owner !== who.uid)) {
+      const documentsLevel = who.level("documents");
+      const canEdit = canWriteModule(documentsLevel) || (seesOwn(documentsLevel) && owner === who.uid);
+      if (!documentId || !snap.exists || !canEdit) {
         return Response.json({ ok: false, error: "doc.forbidden" });
       }
       const previous = typeof snap.data()?.storagePath === "string" ? snap.data()?.storagePath : "";
@@ -99,7 +104,9 @@ export async function POST(request: Request) {
       const reportId = text(form.get("reportId"));
       const name = (text(form.get("name")) || file.name).slice(0, 120);
       const report = await adminDb().collection("projectReports").doc(reportId).get();
+      const reportOwner = typeof report.data()?.createdBy === "string" ? report.data()?.createdBy : "";
       if (!reportId || !report.exists || !name) return Response.json({ ok: false, error: "us.invalid" });
+      if (!canWriteModule(who.level("reports")) && reportOwner !== who.uid) return Response.json({ ok: false, error: "rep.forbidden" });
       const existing = await adminDb().collection("reportFiles").where("reportId", "==", reportId).get();
       if (existing.size >= 10) return Response.json({ ok: false, error: "rep.fileLimit" });
       const storagePath = await savePrivateFile(`project-reports/${reportId}`, type, bytes);

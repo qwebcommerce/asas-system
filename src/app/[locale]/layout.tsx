@@ -2,6 +2,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { AuthProvider } from "@/components/auth-provider";
+import { PermissionsProvider } from "@/components/permissions-provider";
 import { DocumentLocale } from "@/components/document-locale";
 import { IconSprite } from "@/components/icon-sprite";
 import { isLocale, routing } from "@/i18n/routing";
@@ -28,9 +29,11 @@ export default async function LocaleLayout({
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
       <AuthProvider>
-        <DocumentLocale />
-        <IconSprite />
-        {children}
+        <PermissionsProvider>
+          <DocumentLocale />
+          <IconSprite />
+          {children}
+        </PermissionsProvider>
       </AuthProvider>
     </NextIntlClientProvider>
   );

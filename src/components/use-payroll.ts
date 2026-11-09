@@ -3,26 +3,25 @@
 import { useEffect, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/components/auth-provider";
+import { usePermissions } from "@/components/permissions-provider";
+import { canReadAll, canWriteModule } from "@/lib/access";
 import { firebaseDb } from "@/lib/firebase-client";
 import { mapPayrollRun, type PayrollRun } from "@/lib/payroll";
 
 export function usePayroll() {
   const { user, profile, configured } = useAuth();
+  const { ready: accessReady, level } = usePermissions();
+  const payrollLevel = level("payroll");
+  const canView = canReadAll(payrollLevel);
+  const canManage = canWriteModule(payrollLevel);
+  const canApprove = profile?.role === "superAdmin" || payrollLevel === "approve";
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [ready, setReady] = useState(false);
-  const canView = profile?.role === "superAdmin" || profile?.role === "accountant" || profile?.role === "hr";
-  const canManage = profile?.role === "superAdmin" || profile?.role === "accountant";
-  const canApprove = profile?.role === "superAdmin";
 
   useEffect(() => {
-    if (!configured || !user || !profile) {
+    if (!configured || !user || !profile || !accessReady || !canView) {
       setRuns([]);
-      setReady(Boolean(configured && !user));
-      return;
-    }
-    if (profile.role !== "superAdmin" && profile.role !== "accountant" && profile.role !== "hr") {
-      setRuns([]);
-      setReady(true);
+      setReady(Boolean(configured && (!user || (profile && accessReady && !canView))));
       return;
     }
     const unsubscribe = onSnapshot(collection(firebaseDb(), "payrollRuns"), (snap) => {
@@ -33,7 +32,7 @@ export function usePayroll() {
       setReady(true);
     }, () => setReady(true));
     return unsubscribe;
-  }, [configured, profile, user]);
+  }, [accessReady, canView, configured, profile, user]);
 
   return { runs, ready, canView, canManage, canApprove };
 }

@@ -3,7 +3,12 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb, isAdminConfigured } from "@/lib/firebase-admin";
 import { isDepartment, isRequestedRole, isRole, type ActionResult, type Department, type ProfileSettings, type RequestedRole, type Role } from "@/lib/directory";
-import { actor, audit } from "@/server/session";
+import { canWriteModule } from "@/lib/access";
+import { actor, audit, type Gate } from "@/server/session";
+
+function managesUsers(who: Gate) {
+  return canWriteModule(who.level("users"));
+}
 
 export async function createDirectoryUser(
   idToken: string,
@@ -12,7 +17,7 @@ export async function createDirectoryUser(
   try {
     const who = await actor(idToken);
     if ("error" in who) return { ok: false, error: who.error };
-    if (who.role !== "superAdmin") return { ok: false, error: "us.forbidden" };
+    if (!managesUsers(who)) return { ok: false, error: "us.forbidden" };
 
     const name = input.name.trim();
     const email = input.email.trim().toLowerCase();
@@ -59,7 +64,7 @@ export async function updateUserRole(idToken: string, userId: string, role: Role
   try {
     const who = await actor(idToken);
     if ("error" in who) return { ok: false, error: who.error };
-    if (who.role !== "superAdmin") return { ok: false, error: "us.forbidden" };
+    if (!managesUsers(who)) return { ok: false, error: "us.forbidden" };
     if (!isRole(role) || userId === who.uid) return { ok: false, error: "us.invalid" };
     await adminDb().collection("users").doc(userId).update({ role });
     await adminAuth().setCustomUserClaims(userId, { role });
@@ -74,7 +79,7 @@ export async function setUsersDisabled(idToken: string, userIds: string[], disab
   try {
     const who = await actor(idToken);
     if ("error" in who) return { ok: false, error: who.error };
-    if (who.role !== "superAdmin") return { ok: false, error: "us.forbidden" };
+    if (!managesUsers(who)) return { ok: false, error: "us.forbidden" };
     const ids = userIds.filter((id) => id !== who.uid);
     await Promise.all(
       ids.map(async (id) => {
@@ -99,7 +104,7 @@ export async function updateDirectoryUser(
   try {
     const who = await actor(idToken);
     if ("error" in who) return { ok: false, error: who.error };
-    if (who.role !== "superAdmin") return { ok: false, error: "us.forbidden" };
+    if (!managesUsers(who)) return { ok: false, error: "us.forbidden" };
     const snap = await adminDb().collection("users").doc(userId).get();
     if (!snap.exists || snap.data()?.role === "superAdmin" || userId === who.uid) return { ok: false, error: "us.forbidden" };
 
@@ -136,7 +141,7 @@ export async function deleteDirectoryUser(idToken: string, userId: string): Prom
   try {
     const who = await actor(idToken);
     if ("error" in who) return { ok: false, error: who.error };
-    if (who.role !== "superAdmin" || userId === who.uid) return { ok: false, error: "us.forbidden" };
+    if (!managesUsers(who) || userId === who.uid) return { ok: false, error: "us.forbidden" };
     const snap = await adminDb().collection("users").doc(userId).get();
     if (!snap.exists || snap.data()?.role === "superAdmin") return { ok: false, error: "us.forbidden" };
     try {
@@ -190,7 +195,7 @@ export async function reviewAccessRequest(
   try {
     const who = await actor(idToken);
     if ("error" in who) return { ok: false, error: who.error };
-    if (who.role !== "superAdmin") return { ok: false, error: "us.forbidden" };
+    if (!managesUsers(who)) return { ok: false, error: "us.forbidden" };
     const ref = adminDb().collection("accessRequests").doc(requestId);
     const snap = await ref.get();
     if (!snap.exists) return { ok: false, error: "us.invalid" };

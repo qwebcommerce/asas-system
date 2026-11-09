@@ -3,27 +3,28 @@
 import { useEffect, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/components/auth-provider";
-import { mapBill, mapBudget, mapCheque, mapExpense, mapInvoice, type Bill, type Budget, type Cheque, type Expense, type Invoice } from "@/lib/accounting";
+import { usePermissions } from "@/components/permissions-provider";
+import { canReadAll, canWriteModule } from "@/lib/access";
+import { mapBill, mapExpense, mapInvoice, type Bill, type Expense, type Invoice } from "@/lib/accounting";
 import { firebaseDb } from "@/lib/firebase-client";
 
 export function useAccounting() {
   const { user, profile, configured } = useAuth();
+  const { ready: accessReady, level } = usePermissions();
+  const accountingLevel = level("accounting");
+  const canView = canReadAll(accountingLevel);
+  const canManage = canWriteModule(accountingLevel);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
-  const [cheques, setCheques] = useState<Cheque[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [ready, setReady] = useState(false);
-  const canManage = profile?.role === "superAdmin" || profile?.role === "accountant";
 
   useEffect(() => {
-    if (!configured || !user || !profile || !canManage) {
+    if (!configured || !user || !profile || !accessReady || !canView) {
       setInvoices([]);
       setBills([]);
-      setCheques([]);
-      setBudgets([]);
       setExpenses([]);
-      setReady(Boolean(configured && (!user || (profile && !canManage))));
+      setReady(Boolean(configured && (!user || (profile && accessReady && !canView))));
       return;
     }
     const db = firebaseDb();
@@ -39,12 +40,10 @@ export function useAccounting() {
     const unsubscribers = [
       listen("invoices", mapInvoice, setInvoices, true),
       listen("bills", mapBill, setBills),
-      listen("cheques", mapCheque, setCheques),
-      listen("budgets", mapBudget, setBudgets),
       listen("expenses", mapExpense, setExpenses),
     ];
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-  }, [canManage, configured, profile, user]);
+  }, [accessReady, canView, configured, profile, user]);
 
-  return { invoices, bills, cheques, budgets, expenses, ready, canManage };
+  return { invoices, bills, expenses, ready, canView, canManage };
 }

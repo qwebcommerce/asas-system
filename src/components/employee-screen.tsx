@@ -17,7 +17,7 @@ export function EmployeeScreen({ employeeId }: { employeeId: string }) {
   const t = useTranslations();
   const locale = useLocale();
   const { getToken } = useAuth();
-  const { employees, files, ready, canManage } = useHr();
+  const { employees, files, ready, canManage, canOpen } = useHr();
   const person = employees.find((item) => item.id === employeeId) ?? null;
   const ownFiles = files.filter((item) => item.employeeId === employeeId);
   const [editing, setEditing] = useState<EmployeeFile | null>(null);
@@ -53,8 +53,9 @@ export function EmployeeScreen({ employeeId }: { employeeId: string }) {
       </div>
       {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
       {!ready ? <p className="muted">{t("common.loading")}</p> : null}
-      {ready && !person ? <p className="muted">{t("hr.missing")}</p> : null}
-      {person ? (
+      {ready && !canOpen ? <p className="muted">{t("common.forbidden")}</p> : null}
+      {ready && canOpen && !person ? <p className="muted">{t("hr.missing")}</p> : null}
+      {person && canOpen ? (
         <div className="stack">
           <div className="card stack">
             <div className="kv"><span>{t("hr.position")}</span><b>{person.positionEn}</b></div>

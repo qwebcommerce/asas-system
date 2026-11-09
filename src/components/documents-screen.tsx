@@ -25,7 +25,7 @@ export function DocumentsScreen() {
   const t = useTranslations();
   const locale = useLocale();
   const { getToken } = useAuth();
-  const { documents, expiring, ready, canEdit } = useDocuments();
+  const { documents, expiring, ready, canView, canCreate, canEdit } = useDocuments();
   const [folder, setFolder] = useState<(typeof filters)[number]["id"]>("all");
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<LibraryDocument | null>(null);
@@ -57,6 +57,10 @@ export function DocumentsScreen() {
     window.open(result.url, "_blank", "noopener,noreferrer");
   }
 
+  if (!canView && ready) {
+    return <AppShell title={t("nav.documents")}><p className="muted">{t("common.forbidden")}</p></AppShell>;
+  }
+
   return (
     <AppShell title={t("nav.documents")}>
       <div className="docs">
@@ -66,12 +70,14 @@ export function DocumentsScreen() {
             <h2 className="page-title">{t("nav.documents")}</h2>
             <p className="page-sub">{ready ? `${t("doc.count", { count: documents.length })} · ${t("doc.expiringNote", { count: expiring.length })}` : t("common.loading")}</p>
           </div>
-          <div className="hstack page-actions">
-            <button type="button" className="btn btn--primary" onClick={() => { setEditing(null); setAdding(true); }}>
-              <Icon name="upload" />
-              {t("doc.upload")}
-            </button>
-          </div>
+          {canCreate ? (
+            <div className="hstack page-actions">
+              <button type="button" className="btn btn--primary" onClick={() => { setEditing(null); setAdding(true); }}>
+                <Icon name="upload" />
+                {t("doc.upload")}
+              </button>
+            </div>
+          ) : null}
         </div>
         {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
         <div className="row">

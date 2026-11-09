@@ -127,6 +127,7 @@ img, svg { display: block; max-width: 100%; }
 .num { font-variant-numeric: tabular-nums; }
 .muted { color: var(--text-2); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 
 /* ---------- 3. App layout ---------- */
@@ -635,3 +636,77 @@ img, svg { display: block; max-width: 100%; }
   border-end-start-radius: 10px;
 }
 [dir="rtl"] .brand small { letter-spacing: 0.12em; }
+
+.sheet {
+  width: min(210mm, 100%);
+  margin-inline: auto;
+  background: #fff;
+  color: #1c1c1b;
+  box-shadow: 0 12px 40px rgba(28, 28, 27, 0.12);
+  display: grid;
+  grid-template-columns: 36mm 1fr;
+  min-height: 270mm;
+}
+.sheet + .sheet { margin-top: 24px; }
+.sheet-rail { background: #f3f3f2; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 8px; }
+.sheet-rail small { letter-spacing: 0.18em; color: #8a8172; font-size: 10px; }
+.sheet-mark { width: 68px; height: 98px; fill: #1c1c1b; stroke: none; }
+.row-menu { position: relative; display: inline-flex; justify-content: flex-end; }
+.row-menu__list {
+  position: fixed; z-index: 30; min-width: 220px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-pop);
+  display: grid;
+}
+.row-menu__list a, .row-menu__list button {
+  display: block; width: 100%; text-align: start; background: transparent; border: 0; border-radius: 8px;
+  padding: 8px 10px; color: inherit; font: inherit; cursor: pointer;
+}
+.row-menu__list a:hover, .row-menu__list button:hover { background: var(--surface-sunken); }
+.sheet-body { padding: 12mm 12mm 10mm; display: flex; flex-direction: column; gap: 14px; }
+.sheet-ar { direction: rtl; text-align: right; font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", sans-serif; }
+.doc-head { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; border-bottom: 1px solid #1c1c1b; padding-bottom: 10px; }
+.doc-head h2 { margin: 0 0 6px; font-size: 18px; letter-spacing: 0.04em; }
+.doc-head p { margin: 0; }
+.sheet h3 { margin: 0 0 8px; font-size: 15px; display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #1c1c1b; padding-bottom: 4px; }
+.doc-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.doc-bar, .doc-totals > div, .doc-close { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.doc-bar { background: #f3f3f2; padding: 8px 10px; }
+.doc-totals > div { padding: 8px 10px; }
+.doc-totals > div:nth-child(odd) { background: #f3f3f2; }
+.doc-stages, .sheet ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 8px; }
+.doc-stages li, .doc-pay { display: grid; gap: 2px; }
+.doc-stages li { grid-template-columns: 1fr 1fr; gap: 16px; list-style: disc; }
+.doc-stages span, .doc-pay span { display: block; }
+.doc-party p, .doc-terms p, .sheet p { margin: 0; }
+.doc-terms { margin: 0; padding-inline-start: 18px; display: grid; gap: 10px; }
+.doc-terms b { display: block; }
+.doc-close { font-size: 13px; }
+.doc-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 18px; }
+.doc-sign i { display: block; margin-top: 28px; border-bottom: 1px dotted #1c1c1b; }
+.sheet-foot { margin-top: auto; border-top: 1px solid #c9b28a; padding-top: 8px; font-size: 12px; color: #5c5c5a; text-align: center; }
+.sheet table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sheet th, .sheet td { border-bottom: 1px solid #e7e5e1; padding: 6px 4px; text-align: start; vertical-align: top; }
+.sheet th { color: #8a8172; font-weight: 600; }
+@media print {
+  html, body { height: auto; background: #fff; color: #1c1c1b; color-scheme: light; }
+  .sidebar, .topbar, .drawer, .overlay, .no-print { display: none !important; }
+  .app, .main, .content { display: block; margin: 0; padding: 0; background: #fff; color: #1c1c1b; min-height: 0; }
+  .sheet {
+    box-shadow: none;
+    width: 100%;
+    max-width: none;
+    min-height: 270mm;
+    margin: 0;
+    background: #fff;
+    color: #1c1c1b;
+    display: grid;
+    grid-template-columns: 36mm 1fr;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet-rail { background: #f3f3f2; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sheet-mark { width: 68px; height: 98px; max-width: none; }
+  .doc-bar, .doc-totals > div:nth-child(odd) { background: #f3f3f2; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sheet + .sheet { break-before: page; margin-top: 0; }
+  @page { size: A4; margin: 0; }
+}

@@ -21,7 +21,7 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow read: if signedIn() && (request.auth.uid == uid || readsAll("users"));
       allow create: if isAdmin();
       allow update: if isAdmin() || (
         signedIn()
@@ -32,7 +32,7 @@ service cloud.firestore {
     }
 
     match /accessRequests/{id} {
-      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || readsAll("users"));
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == "pending";
@@ -45,111 +45,140 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    function activeRole(role) {
+    function activeSignedIn() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && ownUser().status != "disabled"
-        && ownUser().role == role;
+        && ownUser().status != "disabled";
     }
 
-    function canViewHr() {
-      return isAdmin() || activeRole("hr") || activeRole("accountant");
+    function savedLevel(module) {
+      return !exists(/databases/$(database)/documents/settings/roleMatrix) ? ""
+        : !(get(/databases/$(database)/documents/settings/roleMatrix).data[ownUser().role] is map) ? ""
+        : !(get(/databases/$(database)/documents/settings/roleMatrix).data[ownUser().role][module] is string) ? ""
+        : get(/databases/$(database)/documents/settings/roleMatrix).data[ownUser().role][module];
+    }
+
+    function defaultLevel(role, module) {
+      return role == "hr" && module == "hr" ? "full"
+        : role == "hr" && (module == "documents" || module == "email") ? "own"
+        : role == "hr" && module == "payroll" ? "request"
+        : role == "engineer" && (module == "reports" || module == "offers") ? "full"
+        : role == "engineer" && (module == "hr" || module == "documents" || module == "email") ? "own"
+        : role == "accountant" && (module == "hr" || module == "reports" || module == "offers") ? "view"
+        : role == "accountant" && (module == "accounting" || module == "payroll") ? "full"
+        : role == "accountant" && (module == "documents" || module == "email") ? "own"
+        : role == "staff" && (module == "hr" || module == "documents" || module == "email") ? "own"
+        : role == "staff" && module == "payroll" ? "own"
+        : "none";
+    }
+
+    function level(module) {
+      return !activeSignedIn() ? "none"
+        : ownUser().role == "superAdmin" ? "full"
+        : savedLevel(module) != "" ? savedLevel(module)
+        : defaultLevel(ownUser().role, module);
+    }
+
+    function readsAll(module) {
+      return level(module) == "full" || level(module) == "view" || level(module) == "approve";
+    }
+
+    function readsOwn(module) {
+      return readsAll(module) || level(module) == "own" || level(module) == "request";
     }
 
     match /employees/{id} {
-      allow read: if canViewHr() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow read: if readsAll("hr") || (readsOwn("hr") && resource.data.userId == request.auth.uid);
       allow write: if false;
     }
 
     match /leaveRequests/{id} {
-      allow read: if canViewHr() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow read: if readsAll("hr") || (readsOwn("hr") && resource.data.userId == request.auth.uid);
       allow write: if false;
     }
 
     match /jobs/{id} {
-      allow read: if canViewHr();
+      allow read: if readsAll("hr");
       allow write: if false;
     }
 
     match /applicants/{id} {
-      allow read: if canViewHr();
+      allow read: if readsAll("hr");
       allow write: if false;
     }
 
     match /hrDocuments/{id} {
-      allow read: if canViewHr();
+      allow read: if readsAll("hr");
       allow write: if false;
     }
 
     match /employeeFiles/{id} {
-      allow read: if canViewHr() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow read: if readsAll("hr") || (readsOwn("hr") && resource.data.userId == request.auth.uid);
       allow write: if false;
     }
 
     match /attendanceMarks/{id} {
-      allow read: if canViewHr() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow read: if readsAll("hr") || (readsOwn("hr") && resource.data.userId == request.auth.uid);
       allow write: if false;
     }
 
     match /attendanceReports/{id} {
-      allow read: if canViewHr();
+      allow read: if readsAll("hr");
       allow write: if false;
     }
 
     match /projectReports/{id} {
-      allow read: if isAdmin() || activeRole("engineer") || activeRole("accountant");
+      allow read: if readsAll("reports") || (readsOwn("reports") && resource.data.createdBy == request.auth.uid);
       allow write: if false;
     }
 
     match /offers/{id} {
-      allow read: if isAdmin() || activeRole("engineer") || activeRole("accountant");
+      allow read: if readsAll("offers") || (readsOwn("offers") && resource.data.createdBy == request.auth.uid);
       allow write: if false;
     }
 
     match /libraryDocuments/{id} {
-      allow read: if signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && ownUser().status != "disabled";
+      allow read: if readsAll("documents") || (readsOwn("documents") && resource.data.createdBy == request.auth.uid);
       allow write: if false;
     }
 
     match /reportFiles/{id} {
-      allow read: if isAdmin() || activeRole("engineer") || activeRole("accountant");
+      allow read: if readsAll("reports") || (readsOwn("reports") && resource.data.createdBy == request.auth.uid);
       allow write: if false;
     }
 
     match /invoices/{id} {
-      allow read: if isAdmin() || activeRole("accountant");
+      allow read: if readsAll("accounting");
       allow write: if false;
     }
 
     match /bills/{id} {
-      allow read: if isAdmin() || activeRole("accountant");
+      allow read: if readsAll("accounting");
       allow write: if false;
     }
 
     match /cheques/{id} {
-      allow read: if isAdmin() || activeRole("accountant");
+      allow read: if readsAll("accounting");
       allow write: if false;
     }
 
     match /budgets/{id} {
-      allow read: if isAdmin() || activeRole("accountant");
+      allow read: if readsAll("accounting");
       allow write: if false;
     }
 
     match /expenses/{id} {
-      allow read: if isAdmin() || activeRole("accountant");
+      allow read: if readsAll("accounting");
       allow write: if false;
     }
 
     match /payrollRuns/{id} {
-      allow read: if isAdmin() || activeRole("accountant") || activeRole("hr");
+      allow read: if readsAll("payroll");
       allow write: if false;
     }
 
     match /settings/{id} {
-      allow read: if isAdmin();
+      allow read: if (id == "roleMatrix" && activeSignedIn()) || isAdmin();
       allow write: if false;
     }
   }

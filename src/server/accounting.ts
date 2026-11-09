@@ -1,11 +1,12 @@
 "use server";
 
 import { FieldValue } from "firebase-admin/firestore";
-import { chequeDirections, chequeStatuses, invoiceMath, type BillInput, type BudgetInput, type ChequeInput, type ExpenseInput, type InvoiceInput } from "@/lib/accounting";
+import { billProblem, chequeDirections, chequeStatuses, expenseProblem, invoiceProblem, type BillInput, type BudgetInput, type ChequeInput, type ExpenseInput, type InvoiceInput } from "@/lib/accounting";
 import type { ActionResult } from "@/lib/directory";
 import { qatarToday } from "@/lib/hr";
 import { adminDb } from "@/lib/firebase-admin";
-import { actor, audit, canManageAccounting } from "@/server/session";
+import { canWriteModule } from "@/lib/access";
+import { actor, audit } from "@/server/session";
 
 function clip(value: string, max: number) {
   return value.trim().slice(0, max);
@@ -19,44 +20,47 @@ function qar(value: number, minimum = 0) {
   return Number.isInteger(value) && value >= minimum && value <= 100_000_000 ? value : null;
 }
 
-function pct(value: number) {
-  return Number.isInteger(value) && value >= 0 && value <= 100 ? value : null;
-}
-
 async function manager(idToken: string) {
   const who = await actor(idToken);
   if ("error" in who) return who;
-  if (!canManageAccounting(who.role)) return { error: "fin.forbidden" as const };
+  if (!canWriteModule(who.level("accounting"))) return { error: "fin.forbidden" as const };
   return who;
 }
 
-function cleanInvoice(input: InvoiceInput): InvoiceInput | null {
-  const clientEn = clip(input.clientEn, 160);
-  const clientAr = clip(input.clientAr, 160);
-  const projectEn = clip(input.projectEn, 160);
-  const projectAr = clip(input.projectAr, 160);
-  const contract = qar(input.contract, input.issued ? 1 : 0);
-  const progressPct = pct(input.progressPct);
-  const retentionPct = pct(input.retentionPct);
-  const issuedOn = day(input.issuedOn);
-  const dueOn = day(input.dueOn);
-  if (!clientEn || !clientAr || contract === null || progressPct === null || retentionPct === null || !issuedOn || !dueOn) return null;
-  const received = qar(input.received);
-  if (received === null) return null;
-  const math = invoiceMath(contract, progressPct, retentionPct);
-  if (received > math.net || (!input.issued && received > 0)) return null;
-  return { clientEn, clientAr, projectEn, projectAr, contract, progressPct, retentionPct, received, issuedOn, dueOn, issued: input.issued === true };
+function cleanInvoice(input: InvoiceInput): InvoiceInput | string {
+  const problem = invoiceProblem(input);
+  if (problem) return problem;
+  return {
+    clientEn: clip(input.clientEn, 160),
+    clientAr: clip(input.clientAr, 160),
+    projectEn: clip(input.projectEn, 160),
+    projectAr: clip(input.projectAr, 160),
+    contract: input.contract,
+    progressPct: input.progressPct,
+    retentionPct: input.retentionPct,
+    received: input.received,
+    issuedOn: input.issuedOn,
+    dueOn: input.dueOn,
+    issued: input.issued === true,
+  };
 }
 
-function cleanBill(input: BillInput): BillInput | null {
-  const supplierEn = clip(input.supplierEn, 160);
-  const supplierAr = clip(input.supplierAr, 160);
-  const amount = qar(input.amount, 1);
-  const paid = qar(input.paid);
-  const issuedOn = day(input.issuedOn);
-  const dueOn = day(input.dueOn);
-  if (!supplierEn || !supplierAr || amount === null || paid === null || paid > amount || !issuedOn || !dueOn) return null;
-  return { supplierEn, supplierAr, reference: clip(input.reference, 80), issuedOn, dueOn, amount, paid };
+function cleanBill(input: BillInput): BillInput | string {
+  const problem = billProblem(input);
+  if (problem) return problem;
+  return {
+    supplierEn: clip(input.supplierEn, 160),
+    supplierAr: clip(input.supplierAr, 160),
+    category: input.category,
+    projectEn: clip(input.projectEn, 160),
+    projectAr: clip(input.projectAr, 160),
+    reference: clip(input.reference, 80),
+    note: clip(input.note, 400),
+    issuedOn: input.issuedOn,
+    dueOn: input.dueOn,
+    amount: input.amount,
+    paid: input.paid,
+  };
 }
 
 function cleanCheque(input: ChequeInput): ChequeInput | null {
@@ -79,13 +83,22 @@ function cleanBudget(input: BudgetInput): BudgetInput | null {
   return { projectEn, projectAr, approved, spent };
 }
 
-function cleanExpense(input: ExpenseInput): ExpenseInput | null {
-  const vendorEn = clip(input.vendorEn, 160);
-  const vendorAr = clip(input.vendorAr, 160);
-  const amount = qar(input.amount, 1);
-  const spentOn = day(input.spentOn);
-  if (!vendorEn || !vendorAr || amount === null || !spentOn) return null;
-  return { vendorEn, vendorAr, spentOn, amount, note: clip(input.note, 400) };
+function cleanExpense(input: ExpenseInput): ExpenseInput | string {
+  const problem = expenseProblem(input);
+  if (problem) return problem;
+  return {
+    vendorEn: clip(input.vendorEn, 160),
+    vendorAr: clip(input.vendorAr, 160),
+    category: input.category,
+    projectEn: clip(input.projectEn, 160),
+    projectAr: clip(input.projectAr, 160),
+    reference: clip(input.reference, 80),
+    note: clip(input.note, 400),
+    spentOn: input.spentOn,
+    dueOn: input.dueOn,
+    amount: input.amount,
+    paid: input.paid,
+  };
 }
 
 async function nextInvoiceNumber() {
@@ -112,7 +125,7 @@ export async function createInvoice(idToken: string, input: InvoiceInput): Promi
     const who = await manager(idToken);
     if ("error" in who) return { ok: false, error: who.error };
     const invoice = cleanInvoice(input);
-    if (!invoice) return { ok: false, error: "fin.invalid" };
+    if (typeof invoice === "string") return { ok: false, error: invoice };
     const number = await nextInvoiceNumber();
     const id = await saveNew("invoices", who.uid, { ...invoice, number }, number);
     return { ok: true, id };
@@ -126,7 +139,7 @@ export async function updateInvoice(idToken: string, invoiceId: string, input: I
     const who = await manager(idToken);
     if ("error" in who) return { ok: false, error: who.error };
     const invoice = cleanInvoice(input);
-    if (!invoice) return { ok: false, error: "fin.invalid" };
+    if (typeof invoice === "string") return { ok: false, error: invoice };
     const ref = adminDb().collection("invoices").doc(invoiceId);
     if (!(await ref.get()).exists) return { ok: false, error: "fin.invalid" };
     await ref.update({ ...invoice, updatedAt: FieldValue.serverTimestamp() });
@@ -142,7 +155,7 @@ export async function createBill(idToken: string, input: BillInput): Promise<Act
     const who = await manager(idToken);
     if ("error" in who) return { ok: false, error: who.error };
     const bill = cleanBill(input);
-    if (!bill) return { ok: false, error: "fin.invalid" };
+    if (typeof bill === "string") return { ok: false, error: bill };
     const id = await saveNew("bills", who.uid, bill, bill.supplierEn);
     return { ok: true, id };
   } catch {
@@ -155,7 +168,7 @@ export async function updateBill(idToken: string, billId: string, input: BillInp
     const who = await manager(idToken);
     if ("error" in who) return { ok: false, error: who.error };
     const bill = cleanBill(input);
-    if (!bill) return { ok: false, error: "fin.invalid" };
+    if (typeof bill === "string") return { ok: false, error: bill };
     const ref = adminDb().collection("bills").doc(billId);
     if (!(await ref.get()).exists) return { ok: false, error: "fin.invalid" };
     await ref.update({ ...bill, updatedAt: FieldValue.serverTimestamp() });
@@ -229,7 +242,7 @@ export async function createExpense(idToken: string, input: ExpenseInput): Promi
     const who = await manager(idToken);
     if ("error" in who) return { ok: false, error: who.error };
     const expense = cleanExpense(input);
-    if (!expense) return { ok: false, error: "fin.invalid" };
+    if (typeof expense === "string") return { ok: false, error: expense };
     const id = await saveNew("expenses", who.uid, expense, expense.vendorEn);
     return { ok: true, id };
   } catch {
@@ -242,7 +255,7 @@ export async function updateExpense(idToken: string, expenseId: string, input: E
     const who = await manager(idToken);
     if ("error" in who) return { ok: false, error: who.error };
     const expense = cleanExpense(input);
-    if (!expense) return { ok: false, error: "fin.invalid" };
+    if (typeof expense === "string") return { ok: false, error: expense };
     const ref = adminDb().collection("expenses").doc(expenseId);
     if (!(await ref.get()).exists) return { ok: false, error: "fin.invalid" };
     await ref.update({ ...expense, updatedAt: FieldValue.serverTimestamp() });

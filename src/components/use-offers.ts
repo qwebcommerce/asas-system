@@ -1,32 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/components/auth-provider";
+import { usePermissions } from "@/components/permissions-provider";
+import { canOpenModule, canReadAll, canWriteModule, seesOwn } from "@/lib/access";
 import { firebaseDb } from "@/lib/firebase-client";
 import { mapOffer, type Offer } from "@/lib/offers";
 
 export function useOffers() {
   const { user, profile, configured } = useAuth();
+  const { ready: accessReady, level } = usePermissions();
+  const offersLevel = level("offers");
+  const canView = canOpenModule(offersLevel);
+  const canManage = canWriteModule(offersLevel) || seesOwn(offersLevel);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [ready, setReady] = useState(false);
-  const canManage = profile?.role === "superAdmin" || profile?.role === "engineer";
-  const canView = canManage || profile?.role === "accountant";
 
   useEffect(() => {
-    if (!configured || !user || !profile || !canView) {
+    if (!configured || !user || !profile || !accessReady || !canView) {
       setOffers([]);
-      setReady(Boolean(configured && (!user || (profile && !canView))));
+      setReady(Boolean(configured && (!user || (profile && accessReady && !canView))));
       return;
     }
-    return onSnapshot(collection(firebaseDb(), "offers"), (snap) => {
+    const rows = collection(firebaseDb(), "offers");
+    const source = canReadAll(offersLevel) ? rows : query(rows, where("createdBy", "==", user.uid));
+    return onSnapshot(source, (snap) => {
       setOffers(snap.docs.flatMap((item) => {
         const offer = mapOffer(item.id, item.data());
         return offer ? [offer] : [];
       }));
       setReady(true);
     }, () => setReady(true));
-  }, [canView, configured, profile, user]);
+  }, [accessReady, canView, configured, offersLevel, profile, user]);
 
   return { offers, ready, canManage, canView };
 }

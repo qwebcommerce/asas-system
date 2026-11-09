@@ -9,25 +9,24 @@ import { useAccounting } from "@/components/use-accounting";
 import { Kpi } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/data";
 import { Modal, Toast } from "@/components/ui/overlay";
-import { billState, chequeStatuses, invoiceMath, invoiceState, ledger, monthProfit, owed, partyName, payable, shiftDate, type Bill, type BillInput, type Budget, type BudgetInput, type Cheque, type ChequeInput, type Expense, type ExpenseInput, type Invoice, type InvoiceInput } from "@/lib/accounting";
+import { billCategories, billProblem, billState, invoiceMath, invoiceProblem, invoiceState, ledger, monthProfit, owed, partyName, payable, type Bill, type BillCategory, type BillInput, type Expense, type ExpenseInput, type Invoice, type InvoiceInput } from "@/lib/accounting";
 import { currentMonthKey, qatarToday } from "@/lib/hr";
-import { createBill, createBudget, createCheque, createExpense, createInvoice, deleteAccountingRecord, updateBill, updateBudget, updateCheque, updateExpense, updateInvoice } from "@/server/accounting";
+import { createBill, createInvoice, deleteAccountingRecord, updateBill, updateExpense, updateInvoice } from "@/server/accounting";
 
-type Book = "invoices" | "bills" | "cheques" | "budgets" | "expenses";
+type Book = "invoices" | "bills" | "expenses";
 
 export function AccountingScreen() {
   const t = useTranslations();
   const locale = useLocale();
   const { getToken } = useAuth();
-  const { invoices, bills, cheques, budgets, expenses, ready, canManage } = useAccounting();
+  const { invoices, bills, expenses, ready, canView, canManage } = useAccounting();
   const [tab, setTab] = useState("dash");
   const [editor, setEditor] = useState<{ book: Book; id: string | null } | null>(null);
+  const [costCategory, setCostCategory] = useState<BillCategory | "all">("all");
   const [month, setMonth] = useState(currentMonthKey());
-  const [error, setError] = useState("");
   const [toast, setToast] = useState<{ title: string; detail: string } | null>(null);
   const today = qatarToday();
-  const dueSoon = shiftDate(today, 6);
-  const openBills = bills.filter((bill) => billState(bill, today) !== "paid");
+  const openBills = bills.filter((bill) => billState(bill, today) !== "paid").length + expenses.filter((expense) => expense.paid < expense.amount).length;
   const overdue = invoices.filter((invoice) => invoiceState(invoice, today) === "overdue").length;
   const profit = monthProfit(invoices, bills, expenses, currentMonthKey());
   const lines = ledger(invoices, bills, expenses);
@@ -41,11 +40,8 @@ export function AccountingScreen() {
 
   async function remove(book: Book, id: string, detail: string) {
     const result = await deleteAccountingRecord(await getToken(), book, id);
-    if (!result.ok) setError(t(result.error));
-    else {
-      setError("");
-      notify(t("fin.removed"), detail);
-    }
+    if (!result.ok) notify(t(result.error), detail);
+    else notify(t("fin.removed"), detail);
   }
 
   const months = Array.from({ length: 6 }, (_, index) => shiftMonth(currentMonthKey(), index - 5));
@@ -63,9 +59,9 @@ export function AccountingScreen() {
           </div>
           {canManage ? (
             <div className="hstack page-actions">
-              <button type="button" className="btn btn--secondary" onClick={() => setEditor({ book: "expenses", id: null })}>
-                <Icon name="camera" />
-                {t("fin.expenseAdd")}
+              <button type="button" className="btn btn--secondary" onClick={() => setEditor({ book: "bills", id: null })}>
+                <Icon name="plus" />
+                {t("fin.billAdd")}
               </button>
               <button type="button" className="btn btn--primary" onClick={() => setEditor({ book: "invoices", id: null })}>
                 <Icon name="plus" />
@@ -74,9 +70,8 @@ export function AccountingScreen() {
             </div>
           ) : null}
         </div>
-        {!canManage ? <p className="muted">{t("fin.forbidden")}</p> : null}
-        {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
-        {canManage ? (
+        {!canView && ready ? <p className="muted">{t("common.forbidden")}</p> : null}
+        {canView ? (
           <>
             <Tabs
               value={tab}
@@ -94,7 +89,7 @@ export function AccountingScreen() {
                 <div className="grid-4">
                   <Kpi label={t("fin.revenue")} value={formatQar(profit.revenue, locale)} note={formatMonth(currentMonthKey(), locale)} />
                   <Kpi label={t("acc.k2")} value={formatQar(owed(invoices), locale)} note={t("fin.overdueNote", { count: overdue })} noteTone={overdue ? "danger" : undefined} />
-                  <Kpi label={t("acc.k3")} value={formatQar(payable(bills), locale)} note={t("fin.billNote", { count: openBills.length })} />
+                  <Kpi label={t("acc.k3")} value={formatQar(payable(bills, expenses), locale)} note={t("fin.billNote", { count: openBills })} />
                   <Kpi label={t("fin.profit")} value={formatQar(profit.profit, locale)} note={formatMonth(currentMonthKey(), locale)} dark />
                 </div>
                 <div className="split">
@@ -123,76 +118,14 @@ export function AccountingScreen() {
                   </div>
                   <div className="stack">
                     <div className="card">
-                      <div className="between">
-                        <h3 className="card-title">{t("acc.cheques")}</h3>
-                        <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditor({ book: "cheques", id: null })}>{t("fin.chequeAdd")}</button>
-                      </div>
-                      {cheques.length === 0 ? <p className="muted">{t("fin.noCheques")}</p> : null}
-                      {cheques.slice().sort((a, b) => a.dueOn.localeCompare(b.dueOn)).map((cheque) => (
-                        <div className="list-row" key={cheque.id}>
-                          <span className="tile-icon"><Icon name="cheque" className="icon icon--sm" /></span>
-                          <div className="grow">
-                            <b>{partyName(cheque, locale)}</b>
-                            <small><bdi>{cheque.number}</bdi> · {formatDay(cheque.dueOn, locale)}{cheque.dueOn >= today && cheque.dueOn <= dueSoon && cheque.status !== "cleared" && cheque.status !== "bounced" ? ` · ${t("fin.dueWeek")}` : ""}</small>
-                          </div>
-                          <div style={{ textAlign: "end" }}>
-                            <b className="num">{formatQar(cheque.amount, locale)}</b>
-                            <span className={`badge badge--${cheque.direction === "in" ? "ok" : "warn"}`}>{t(cheque.direction === "in" ? "chq.in" : "chq.out")}</span>
-                          </div>
-                          <div className="hstack">
-                            <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditor({ book: "cheques", id: cheque.id })}>{t("us.edit")}</button>
-                            <button type="button" className="btn btn--ghost btn--sm" onClick={() => void remove("cheques", cheque.id, cheque.number)}>{t("us.delete")}</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="card">
-                      <div className="between">
-                        <div>
-                          <h3 className="card-title">{t("acc.budgets")}</h3>
-                          <p className="card-sub">{t("acc.budgetsS")}</p>
-                        </div>
-                        <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditor({ book: "budgets", id: null })}>{t("fin.budgetAdd")}</button>
-                      </div>
-                      {budgets.length === 0 ? <p className="muted">{t("fin.noBudgets")}</p> : null}
-                      {budgets.map((budget) => {
-                        const ratio = budget.approved === 0 ? 1 : budget.spent / budget.approved;
-                        return (
-                          <div key={budget.id} className="stack stack--sm" style={{ gap: 6, padding: "8px 0" }}>
-                            <div className="between">
-                              <b style={{ fontSize: 13.5 }}>{partyName(budget, locale)}</b>
-                              <span className={`num ${ratio >= 1 ? "note--danger" : ratio >= 0.9 ? "note--warn" : "muted"}`}><bdi>{formatQar(budget.spent, locale)} / {formatQar(budget.approved, locale)}</bdi></span>
-                            </div>
-                            <div className={`progress${ratio >= 1 ? " progress--danger" : ""}`}>
-                              <span style={{ width: `${Math.min(100, Math.round(ratio * 100))}%` }} />
-                            </div>
-                            <div className="hstack">
-                              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditor({ book: "budgets", id: budget.id })}>{t("us.edit")}</button>
-                              <button type="button" className="btn btn--ghost btn--sm" onClick={() => void remove("budgets", budget.id, partyName(budget, locale))}>{t("us.delete")}</button>
-                            </div>
-                          </div>
-                        );
+                      <h3 className="card-title">{t("fin.spend")}</h3>
+                      <p className="card-sub">{formatMonth(currentMonthKey(), locale)}</p>
+                      {billCategories.every((category) => categorySpend(bills, expenses, currentMonthKey(), category) === 0) ? <p className="muted">{t("fin.noBills")}</p> : null}
+                      {billCategories.map((category) => {
+                        const total = categorySpend(bills, expenses, currentMonthKey(), category);
+                        if (total === 0) return null;
+                        return <div className="kv" key={category}><span>{t(`fin.cat.${category}`)}</span><b className="num"><bdi>{formatQar(total, locale)}</bdi></b></div>;
                       })}
-                    </div>
-                    <div className="card">
-                      <div className="between">
-                        <h3 className="card-title">{t("fin.expenses")}</h3>
-                        <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditor({ book: "expenses", id: null })}>{t("fin.expenseAdd")}</button>
-                      </div>
-                      {expenses.length === 0 ? <p className="muted">{t("fin.noExpenses")}</p> : null}
-                      {expenses.slice().sort((a, b) => b.spentOn.localeCompare(a.spentOn)).map((expense) => (
-                        <div className="list-row" key={expense.id}>
-                          <div className="grow">
-                            <b>{partyName(expense, locale)}</b>
-                            <small>{formatDay(expense.spentOn, locale)}{expense.note ? ` · ${expense.note}` : ""}</small>
-                          </div>
-                          <b className="num">{formatQar(expense.amount, locale)}</b>
-                          <div className="hstack">
-                            <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditor({ book: "expenses", id: expense.id })}>{t("us.edit")}</button>
-                            <button type="button" className="btn btn--ghost btn--sm" onClick={() => void remove("expenses", expense.id, partyName(expense, locale))}>{t("us.delete")}</button>
-                          </div>
-                        </div>
-                      ))}
                     </div>
                   </div>
                 </div>
@@ -213,6 +146,7 @@ export function AccountingScreen() {
                     amount: formatQar(math.net, locale),
                   };
                 })}
+                manage={canManage}
                 onEdit={(id) => setEditor({ book: "invoices", id })}
                 onDelete={(id) => {
                   const invoice = invoices.find((item) => item.id === id);
@@ -222,17 +156,29 @@ export function AccountingScreen() {
             ) : null}
             {tab === "bills" ? (
               <>
-                <div className="hstack"><button type="button" className="btn btn--primary" onClick={() => setEditor({ book: "bills", id: null })}><Icon name="plus" />{t("fin.billAdd")}</button></div>
+                <div className="between">
+                  <select className="select" style={{ width: "auto" }} value={costCategory} onChange={(event) => setCostCategory(event.target.value as BillCategory | "all")}>
+                    <option value="all">{t("fin.allCosts")}</option>
+                    {billCategories.map((category) => <option key={category} value={category}>{t(`fin.cat.${category}`)}</option>)}
+                  </select>
+                  {canManage ? <button type="button" className="btn btn--primary" onClick={() => setEditor({ book: "bills", id: null })}><Icon name="plus" />{t("fin.billAdd")}</button> : null}
+                </div>
                 <BookTable
+                  showCategory
+                  manage={canManage}
                   empty={ready ? t("fin.noBills") : t("common.loading")}
-                  rows={bills.slice().sort((a, b) => b.issuedOn.localeCompare(a.issuedOn)).map((bill) => {
-                    const state = billState(bill, today);
-                    return { id: bill.id, title: partyName(bill, locale), meta: bill.reference || formatDay(bill.dueOn, locale), status: t(`fin.${state}`), tone: tone(state), amount: formatQar(Math.max(0, bill.amount - bill.paid), locale) };
-                  })}
-                  onEdit={(id) => setEditor({ book: "bills", id })}
+                  rows={costRows(bills, expenses, costCategory, today, locale, t)}
+                  onEdit={(id) => {
+                    const source = id.slice(0, id.indexOf(":"));
+                    const recordId = id.slice(id.indexOf(":") + 1);
+                    if (source === "bills" || source === "expenses") setEditor({ book: source, id: recordId });
+                  }}
                   onDelete={(id) => {
-                    const bill = bills.find((item) => item.id === id);
-                    if (bill) void remove("bills", id, partyName(bill, locale));
+                    const source = id.slice(0, id.indexOf(":"));
+                    const recordId = id.slice(id.indexOf(":") + 1);
+                    if (source !== "bills" && source !== "expenses") return;
+                    const record = source === "bills" ? bills.find((item) => item.id === recordId) : expenses.find((item) => item.id === recordId);
+                    if (record) void remove(source, recordId, partyName(record, locale));
                   }}
                 />
               </>
@@ -282,16 +228,12 @@ export function AccountingScreen() {
           editor={editor}
           invoices={invoices}
           bills={bills}
-          cheques={cheques}
-          budgets={budgets}
           expenses={expenses}
           onClose={() => setEditor(null)}
           onSaved={(detail) => {
             setEditor(null);
-            setError("");
             notify(t("fin.saved"), detail);
           }}
-          onError={(message) => setError(message)}
           getToken={getToken}
         />
         <Toast open={Boolean(toast)} title={toast?.title ?? ""} detail={toast?.detail ?? ""} />
@@ -300,7 +242,7 @@ export function AccountingScreen() {
   );
 }
 
-function BookTable({ rows, empty, onEdit, onDelete }: { rows: { id: string; title: string; meta: string; status: string; tone: string; amount: string }[]; empty: string; onEdit: (id: string) => void; onDelete: (id: string) => void }) {
+function BookTable({ rows, empty, onEdit, onDelete, showCategory = false, manage = false }: { rows: { id: string; title: string; meta: string; category?: string; status: string; tone: string; amount: string }[]; empty: string; onEdit: (id: string) => void; onDelete: (id: string) => void; showCategory?: boolean; manage?: boolean }) {
   const t = useTranslations();
   return (
     <div className="card card--flush table-wrap">
@@ -308,24 +250,28 @@ function BookTable({ rows, empty, onEdit, onDelete }: { rows: { id: string; titl
         <thead>
           <tr>
             <th>{t("col.name")}</th>
+            {showCategory ? <th>{t("fin.category")}</th> : null}
             <th>{t("col.status")}</th>
             <th className="end">{t("col.net")}</th>
-            <th />
+            {manage ? <th /> : null}
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 ? <tr><td colSpan={4}>{empty}</td></tr> : null}
+          {rows.length === 0 ? <tr><td colSpan={(showCategory ? 4 : 3) + (manage ? 1 : 0)}>{empty}</td></tr> : null}
           {rows.map((row) => (
             <tr key={row.id}>
               <td data-label={t("col.name")}><b>{row.title}</b><small className="muted" style={{ display: "block" }}><bdi>{row.meta}</bdi></small></td>
+              {showCategory ? <td data-label={t("fin.category")}>{row.category}</td> : null}
               <td data-label={t("col.status")}><span className={`badge badge--${row.tone}`}>{row.status}</span></td>
               <td data-label={t("col.net")} className="num end"><bdi>{row.amount}</bdi></td>
-              <td className="end" data-label="">
-                <div className="hstack">
-                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => onEdit(row.id)}>{t("us.edit")}</button>
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => onDelete(row.id)}>{t("us.delete")}</button>
-                </div>
-              </td>
+              {manage ? (
+                <td className="end" data-label="">
+                  <div className="hstack">
+                    <button type="button" className="btn btn--secondary btn--sm" onClick={() => onEdit(row.id)}>{t("us.edit")}</button>
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => onDelete(row.id)}>{t("us.delete")}</button>
+                  </div>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
@@ -334,43 +280,45 @@ function BookTable({ rows, empty, onEdit, onDelete }: { rows: { id: string; titl
   );
 }
 
-function RecordModal({ editor, invoices, bills, cheques, budgets, expenses, onClose, onSaved, onError, getToken }: {
+function RecordModal({ editor, invoices, bills, expenses, onClose, onSaved, getToken }: {
   editor: { book: Book; id: string | null } | null;
   invoices: Invoice[];
   bills: Bill[];
-  cheques: Cheque[];
-  budgets: Budget[];
   expenses: Expense[];
   onClose: () => void;
   onSaved: (detail: string) => void;
-  onError: (message: string) => void;
   getToken: () => Promise<string>;
 }) {
   const t = useTranslations();
   const title = !editor ? "" : t(editor.id ? `fin.edit.${editor.book}` : `fin.add.${editor.book}`);
   return (
     <Modal open={editor !== null} title={title} onClose={onClose}>
-      {editor?.book === "invoices" ? <InvoiceForm record={invoices.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} onError={onError} /> : null}
-      {editor?.book === "bills" ? <BillForm record={bills.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} onError={onError} /> : null}
-      {editor?.book === "cheques" ? <ChequeForm record={cheques.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} onError={onError} /> : null}
-      {editor?.book === "budgets" ? <BudgetForm record={budgets.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} onError={onError} /> : null}
-      {editor?.book === "expenses" ? <ExpenseForm record={expenses.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} onError={onError} /> : null}
+      {editor?.book === "invoices" ? <InvoiceForm record={invoices.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} /> : null}
+      {editor?.book === "bills" ? <BillForm source="bills" record={bills.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} /> : null}
+      {editor?.book === "expenses" ? <BillForm source="expenses" record={expenseAsBill(expenses.find((item) => item.id === editor.id))} getToken={getToken} onClose={onClose} onSaved={onSaved} /> : null}
     </Modal>
   );
 }
 
-function InvoiceForm({ record, getToken, onClose, onSaved, onError }: FormProps<Invoice>) {
+function InvoiceForm({ record, getToken, onClose, onSaved }: FormProps<Invoice>) {
   const t = useTranslations();
   const locale = useLocale();
   const [form, setForm] = useState<InvoiceInput>(blankInvoice());
+  const [error, setError] = useState("");
   useEffect(() => {
     setForm(record ? (({ id: _id, number: _number, ...input }) => input)(record) : blankInvoice());
+    setError("");
   }, [record]);
   const math = invoiceMath(form.contract, form.progressPct, form.retentionPct);
   return (
     <form className="stack" onSubmit={(event) => {
       event.preventDefault();
-      void saveForm(record ? (token) => updateInvoice(token, record.id, form) : (token) => createInvoice(token, form), getToken, record?.number || form.clientEn, onSaved, onError, t);
+      const problem = invoiceProblem(form);
+      if (problem) {
+        setError(t(problem));
+        return;
+      }
+      void saveForm(record ? (token) => updateInvoice(token, record.id, form) : (token) => createInvoice(token, form), getToken, record?.number || form.clientEn, onSaved, setError, t);
     }}>
       <div className="form-grid form-grid--2">
         <Text label={t("off.client")} value={form.clientEn} onChange={(clientEn) => setForm({ ...form, clientEn })} />
@@ -386,111 +334,53 @@ function InvoiceForm({ record, getToken, onClose, onSaved, onError }: FormProps<
       </div>
       <p className="muted"><bdi>{t("fin.billed")} {formatQar(math.billed, locale)} · {t("fin.retentionAmt")} {formatQar(math.retention, locale)} · {t("fin.net")} {formatQar(math.net, locale)}</bdi></p>
       <label className="check"><input type="checkbox" checked={form.issued} onChange={(event) => setForm({ ...form, issued: event.target.checked, received: event.target.checked ? form.received : 0 })} /><span>{t("fin.issued")}</span></label>
+      <FormError message={error} />
       <FormActions onClose={onClose} />
     </form>
   );
 }
 
-function BillForm({ record, getToken, onClose, onSaved, onError }: FormProps<Bill>) {
+function BillForm({ source, record, getToken, onClose, onSaved }: FormProps<Bill> & { source: "bills" | "expenses" }) {
   const t = useTranslations();
   const [form, setForm] = useState<BillInput>(blankBill());
+  const [error, setError] = useState("");
   useEffect(() => {
     setForm(record ? (({ id: _id, ...input }) => input)(record) : blankBill());
+    setError("");
   }, [record]);
   return (
     <form className="stack" onSubmit={(event) => {
       event.preventDefault();
-      void saveForm(record ? (token) => updateBill(token, record.id, form) : (token) => createBill(token, form), getToken, form.supplierEn, onSaved, onError, t);
+      const problem = billProblem(form);
+      if (problem) {
+        setError(t(problem));
+        return;
+      }
+      const save = source === "expenses" && record
+        ? (token: string) => updateExpense(token, record.id, expenseInput(form))
+        : record
+          ? (token: string) => updateBill(token, record.id, form)
+          : (token: string) => createBill(token, form);
+      void saveForm(save, getToken, form.supplierEn, onSaved, setError, t);
     }}>
       <div className="form-grid form-grid--2">
+        <Field label={t("fin.category")}>
+          <select className="select" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as BillCategory })}>
+            {billCategories.map((category) => <option key={category} value={category}>{t(`fin.cat.${category}`)}</option>)}
+          </select>
+        </Field>
+        <Text label={t("fin.reference")} value={form.reference} onChange={(reference) => setForm({ ...form, reference })} />
         <Text label={t("fin.supplier")} value={form.supplierEn} onChange={(supplierEn) => setForm({ ...form, supplierEn })} />
         <Text label={t("fin.supplierAr")} value={form.supplierAr} onChange={(supplierAr) => setForm({ ...form, supplierAr })} />
-        <Text label={t("fin.reference")} value={form.reference} onChange={(reference) => setForm({ ...form, reference })} />
+        <Text label={t("off.project")} value={form.projectEn} onChange={(projectEn) => setForm({ ...form, projectEn })} />
+        <Text label={t("off.projectAr")} value={form.projectAr} onChange={(projectAr) => setForm({ ...form, projectAr })} />
         <NumberField label={t("fin.amount")} value={form.amount} onChange={(amount) => setForm({ ...form, amount })} />
         <NumberField label={t("fin.paidAmount")} value={form.paid} onChange={(paid) => setForm({ ...form, paid })} />
         <DateField label={t("fin.issuedOn")} value={form.issuedOn} onChange={(issuedOn) => setForm({ ...form, issuedOn })} />
         <DateField label={t("fin.dueOn")} value={form.dueOn} onChange={(dueOn) => setForm({ ...form, dueOn })} />
       </div>
-      <FormActions onClose={onClose} />
-    </form>
-  );
-}
-
-function ChequeForm({ record, getToken, onClose, onSaved, onError }: FormProps<Cheque>) {
-  const t = useTranslations();
-  const [form, setForm] = useState<ChequeInput>(blankCheque());
-  useEffect(() => {
-    setForm(record ? (({ id: _id, ...input }) => input)(record) : blankCheque());
-  }, [record]);
-  return (
-    <form className="stack" onSubmit={(event) => {
-      event.preventDefault();
-      void saveForm(record ? (token) => updateCheque(token, record.id, form) : (token) => createCheque(token, form), getToken, form.number, onSaved, onError, t);
-    }}>
-      <div className="form-grid form-grid--2">
-        <Text label={t("fin.party")} value={form.partyEn} onChange={(partyEn) => setForm({ ...form, partyEn })} />
-        <Text label={t("fin.partyAr")} value={form.partyAr} onChange={(partyAr) => setForm({ ...form, partyAr })} />
-        <Text label={t("fin.chequeNo")} value={form.number} onChange={(number) => setForm({ ...form, number })} />
-        <Text label={t("col.bank")} value={form.bank} onChange={(bank) => setForm({ ...form, bank })} />
-        <NumberField label={t("fin.amount")} value={form.amount} onChange={(amount) => setForm({ ...form, amount })} />
-        <DateField label={t("fin.dueOn")} value={form.dueOn} onChange={(dueOn) => setForm({ ...form, dueOn })} />
-        <Field label={t("fin.direction")}>
-          <select className="select" value={form.direction} onChange={(event) => setForm({ ...form, direction: event.target.value as ChequeInput["direction"] })}>
-            <option value="in">{t("chq.in")}</option>
-            <option value="out">{t("chq.out")}</option>
-          </select>
-        </Field>
-        <Field label={t("col.status")}>
-          <select className="select" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ChequeInput["status"] })}>
-            {chequeStatuses.map((status) => <option key={status} value={status}>{t(`fin.${status}`)}</option>)}
-          </select>
-        </Field>
-      </div>
-      <FormActions onClose={onClose} />
-    </form>
-  );
-}
-
-function BudgetForm({ record, getToken, onClose, onSaved, onError }: FormProps<Budget>) {
-  const t = useTranslations();
-  const [form, setForm] = useState<BudgetInput>(blankBudget());
-  useEffect(() => {
-    setForm(record ? (({ id: _id, ...input }) => input)(record) : blankBudget());
-  }, [record]);
-  return (
-    <form className="stack" onSubmit={(event) => {
-      event.preventDefault();
-      void saveForm(record ? (token) => updateBudget(token, record.id, form) : (token) => createBudget(token, form), getToken, form.projectEn, onSaved, onError, t);
-    }}>
-      <div className="form-grid form-grid--2">
-        <Text label={t("off.project")} value={form.projectEn} onChange={(projectEn) => setForm({ ...form, projectEn })} />
-        <Text label={t("off.projectAr")} value={form.projectAr} onChange={(projectAr) => setForm({ ...form, projectAr })} />
-        <NumberField label={t("fin.approved")} value={form.approved} onChange={(approved) => setForm({ ...form, approved })} />
-        <NumberField label={t("fin.spent")} value={form.spent} onChange={(spent) => setForm({ ...form, spent })} />
-      </div>
-      <FormActions onClose={onClose} />
-    </form>
-  );
-}
-
-function ExpenseForm({ record, getToken, onClose, onSaved, onError }: FormProps<Expense>) {
-  const t = useTranslations();
-  const [form, setForm] = useState<ExpenseInput>(blankExpense());
-  useEffect(() => {
-    setForm(record ? (({ id: _id, ...input }) => input)(record) : blankExpense());
-  }, [record]);
-  return (
-    <form className="stack" onSubmit={(event) => {
-      event.preventDefault();
-      void saveForm(record ? (token) => updateExpense(token, record.id, form) : (token) => createExpense(token, form), getToken, form.vendorEn, onSaved, onError, t);
-    }}>
-      <div className="form-grid form-grid--2">
-        <Text label={t("fin.vendor")} value={form.vendorEn} onChange={(vendorEn) => setForm({ ...form, vendorEn })} />
-        <Text label={t("fin.vendorAr")} value={form.vendorAr} onChange={(vendorAr) => setForm({ ...form, vendorAr })} />
-        <DateField label={t("rep.date")} value={form.spentOn} onChange={(spentOn) => setForm({ ...form, spentOn })} />
-        <NumberField label={t("fin.amount")} value={form.amount} onChange={(amount) => setForm({ ...form, amount })} />
-      </div>
       <Field label={t("fin.note")}><textarea className="textarea" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
+      <FormError message={error} />
       <FormActions onClose={onClose} />
     </form>
   );
@@ -529,17 +419,22 @@ function DateField({ label, value, onChange }: { label: string; value: string; o
   return <Field label={label}><input className="input" type="date" value={value} onChange={(event) => onChange(event.target.value)} /></Field>;
 }
 
+function FormError({ message }: { message: string }) {
+  if (!message) return null;
+  return <p style={{ color: "var(--danger)" }}>{message}</p>;
+}
+
 type FormProps<T> = {
   record: T | null;
   getToken: () => Promise<string>;
   onClose: () => void;
   onSaved: (detail: string) => void;
-  onError: (message: string) => void;
 };
 
-async function saveForm(action: (token: string) => Promise<{ ok: true; id?: string } | { ok: false; error: string }>, getToken: () => Promise<string>, detail: string, onSaved: (detail: string) => void, onError: (message: string) => void, t: (key: string) => string) {
+async function saveForm(action: (token: string) => Promise<{ ok: true; id?: string } | { ok: false; error: string }>, getToken: () => Promise<string>, detail: string, onSaved: (detail: string) => void, setError: (message: string) => void, t: (key: string) => string) {
+  setError("");
   const result = await action(await getToken());
-  if (!result.ok) onError(t(result.error));
+  if (!result.ok) setError(t(result.error));
   else onSaved(detail);
 }
 
@@ -550,19 +445,72 @@ function blankInvoice(): InvoiceInput {
 
 function blankBill(): BillInput {
   const today = qatarToday();
-  return { supplierEn: "", supplierAr: "", reference: "", issuedOn: today, dueOn: today, amount: 0, paid: 0 };
+  return { supplierEn: "", supplierAr: "", category: "office", projectEn: "", projectAr: "", reference: "", note: "", issuedOn: today, dueOn: today, amount: 0, paid: 0 };
 }
 
-function blankCheque(): ChequeInput {
-  return { partyEn: "", partyAr: "", number: "", bank: "", amount: 0, dueOn: qatarToday(), direction: "in", status: "inhand" };
+function expenseAsBill(expense: Expense | undefined): Bill | null {
+  if (!expense) return null;
+  return {
+    id: expense.id,
+    supplierEn: expense.vendorEn,
+    supplierAr: expense.vendorAr,
+    category: expense.category,
+    projectEn: expense.projectEn,
+    projectAr: expense.projectAr,
+    reference: expense.reference,
+    note: expense.note,
+    issuedOn: expense.spentOn,
+    dueOn: expense.dueOn,
+    amount: expense.amount,
+    paid: expense.paid,
+  };
 }
 
-function blankBudget(): BudgetInput {
-  return { projectEn: "", projectAr: "", approved: 0, spent: 0 };
+function expenseInput(form: BillInput): ExpenseInput {
+  return {
+    vendorEn: form.supplierEn,
+    vendorAr: form.supplierAr,
+    category: form.category,
+    projectEn: form.projectEn,
+    projectAr: form.projectAr,
+    reference: form.reference,
+    note: form.note,
+    spentOn: form.issuedOn,
+    dueOn: form.dueOn,
+    amount: form.amount,
+    paid: form.paid,
+  };
 }
 
-function blankExpense(): ExpenseInput {
-  return { vendorEn: "", vendorAr: "", spentOn: qatarToday(), amount: 0, note: "" };
+function categorySpend(bills: Bill[], expenses: Expense[], month: string, category: BillCategory) {
+  return bills.reduce((sum, bill) => sum + (bill.category === category && bill.issuedOn.startsWith(month) ? bill.amount : 0), 0)
+    + expenses.reduce((sum, expense) => sum + (expense.category === category && expense.spentOn.startsWith(month) ? expense.amount : 0), 0);
+}
+
+function costRows(bills: Bill[], expenses: Expense[], category: BillCategory | "all", today: string, locale: string, t: (key: string) => string) {
+  return [
+    ...bills.map((bill) => ({ source: "bills" as const, bill })),
+    ...expenses.flatMap((expense) => {
+      const bill = expenseAsBill(expense);
+      return bill ? [{ source: "expenses" as const, bill }] : [];
+    }),
+  ]
+    .filter((row) => category === "all" || row.bill.category === category)
+    .sort((a, b) => b.bill.issuedOn.localeCompare(a.bill.issuedOn))
+    .map((row) => {
+      const state = billState(row.bill, today);
+      const project = partyName({ projectEn: row.bill.projectEn, projectAr: row.bill.projectAr }, locale);
+      const meta = [row.bill.reference, project, row.bill.note].filter(Boolean).join(" · ");
+      return {
+        id: `${row.source}:${row.bill.id}`,
+        title: partyName(row.bill, locale),
+        meta: meta || formatDay(row.bill.dueOn, locale),
+        category: t(`fin.cat.${row.bill.category}`),
+        status: t(`fin.${state}`),
+        tone: tone(state),
+        amount: formatQar(Math.max(0, row.bill.amount - row.bill.paid), locale),
+      };
+    });
 }
 
 function tone(status: string) {

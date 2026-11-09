@@ -3,9 +3,11 @@
 import { FieldValue } from "firebase-admin/firestore";
 import type { ActionResult } from "@/lib/directory";
 import { currentMonthKey } from "@/lib/hr";
-import { mapPayrollRun, payMethods, type PayMethod, type PayrollLine } from "@/lib/payroll";
+import { mapPayrollRun, payMethods, type PayrollLine } from "@/lib/payroll";
 import { adminDb } from "@/lib/firebase-admin";
-import { actor, audit, canManagePayroll } from "@/server/session";
+import { canWriteModule } from "@/lib/access";
+import { payrollLines, syncDraftPayrollRuns } from "@/server/payroll-lines";
+import { actor, audit } from "@/server/session";
 
 function money(value: number) {
   return Number.isInteger(value) && value >= 0 && value <= 1_000_000 ? value : null;
@@ -29,7 +31,7 @@ function cleanLines(stored: PayrollLine[], input: PayrollLine[]): PayrollLine[] 
 async function manager(idToken: string) {
   const who = await actor(idToken);
   if ("error" in who) return who;
-  if (!canManagePayroll(who.role)) return { error: "pay.forbidden" as const };
+  if (!canWriteModule(who.level("payroll"))) return { error: "pay.forbidden" as const };
   return who;
 }
 
@@ -47,37 +49,8 @@ export async function createPayrollRun(idToken: string, month: string): Promise<
     if (!/^\d{4}-\d{2}$/.test(month) || month > currentMonthKey()) return { ok: false, error: "pay.future" };
     const ref = adminDb().collection("payrollRuns").doc(month);
     if ((await ref.get()).exists) return { ok: false, error: "pay.exists" };
-    const employees = await adminDb().collection("employees").get();
-    const marks = await adminDb().collection("attendanceMarks").where("date", ">=", `${month}-01`).where("date", "<=", `${month}-31`).get();
-    const absent = new Map<string, number>();
-    const late = new Map<string, number>();
-    marks.docs.forEach((item) => {
-      const data = item.data();
-      const employeeId = typeof data.employeeId === "string" ? data.employeeId : "";
-      if (!employeeId) return;
-      if (data.status === "absent") absent.set(employeeId, (absent.get(employeeId) ?? 0) + 1);
-      if (data.status === "late") late.set(employeeId, (late.get(employeeId) ?? 0) + 1);
-    });
     const report = await adminDb().collection("attendanceReports").doc(month).get();
-    const lines: PayrollLine[] = employees.docs
-      .flatMap((item) => {
-        const data = item.data();
-        if (data.employment === "inactive") return [];
-        const basic = typeof data.basic === "number" && Number.isFinite(data.basic) ? Math.round(data.basic) : 0;
-        if (basic < 0 || basic > 1_000_000) return [];
-        return [{
-          employeeId: item.id,
-          code: typeof data.employeeId === "string" ? data.employeeId : "",
-          name: typeof data.name === "string" ? data.name : "",
-          basic,
-          allowance: 0,
-          deduction: 0,
-          method: "cash" as PayMethod,
-          absent: absent.get(item.id) ?? 0,
-          late: late.get(item.id) ?? 0,
-        }];
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const lines = await payrollLines(month);
     if (lines.length === 0) return { ok: false, error: "pay.noEmployees" };
     await ref.set({
       month,
@@ -91,6 +64,17 @@ export async function createPayrollRun(idToken: string, month: string): Promise<
     });
     await audit("payroll.create", who.uid, month, String(lines.length));
     return { ok: true, id: month };
+  } catch {
+    return { ok: false, error: "auth.failed" };
+  }
+}
+
+export async function refreshPayrollDrafts(idToken: string): Promise<ActionResult> {
+  try {
+    const who = await manager(idToken);
+    if ("error" in who) return { ok: false, error: who.error };
+    await syncDraftPayrollRuns();
+    return { ok: true };
   } catch {
     return { ok: false, error: "auth.failed" };
   }
@@ -117,7 +101,7 @@ export async function approvePayrollRun(idToken: string, month: string): Promise
   try {
     const who = await actor(idToken);
     if ("error" in who) return { ok: false, error: who.error };
-    if (who.role !== "superAdmin") return { ok: false, error: "pay.forbidden" };
+    if (who.role !== "superAdmin" && who.level("payroll") !== "approve") return { ok: false, error: "pay.forbidden" };
     const snap = await runOf(month);
     if (!snap || snap.data()?.status !== "draft") return { ok: false, error: "pay.locked" };
     await snap.ref.update({ status: "approved", approvedBy: who.uid, approvedAt: FieldValue.serverTimestamp() });
@@ -132,7 +116,7 @@ export async function reopenPayrollRun(idToken: string, month: string): Promise<
   try {
     const who = await actor(idToken);
     if ("error" in who) return { ok: false, error: who.error };
-    if (who.role !== "superAdmin") return { ok: false, error: "pay.forbidden" };
+    if (who.role !== "superAdmin" && who.level("payroll") !== "approve") return { ok: false, error: "pay.forbidden" };
     const snap = await runOf(month);
     if (!snap || snap.data()?.status !== "approved") return { ok: false, error: "pay.locked" };
     await snap.ref.update({ status: "draft", approvedBy: "", approvedAt: null });

@@ -14,7 +14,7 @@ export function NotificationsScreen() {
   const t = useTranslations();
   const locale = useLocale();
   const { getToken } = useAuth();
-  const { expiring, ready } = useDocuments();
+  const { expiring, ready, canView } = useDocuments();
   const [error, setError] = useState("");
   const notices = useMemo(() => {
     const items: Notice[] = [...expiring]
@@ -41,6 +41,10 @@ export function NotificationsScreen() {
       return;
     }
     window.open(result.url, "_blank", "noopener,noreferrer");
+  }
+
+  if (!canView && ready) {
+    return <AppShell title={t("ntf.title")}><p className="muted">{t("common.forbidden")}</p></AppShell>;
   }
 
   return (

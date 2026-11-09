@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
 import { useAccounting } from "@/components/use-accounting";
 import { useDirectory } from "@/components/use-directory";
+import { usePermissions } from "@/components/permissions-provider";
 import { useDocuments } from "@/components/use-documents";
 import { useHr } from "@/components/use-hr";
 import { useOffers } from "@/components/use-offers";
@@ -14,6 +15,7 @@ import { Kpi } from "@/components/ui/card";
 import { Bars, ListRow } from "@/components/ui/data";
 import { Link } from "@/i18n/navigation";
 import { invoiceState, monthProfit, owed, payable, shiftDate, weekdayIndex } from "@/lib/accounting";
+import { canOpenModule, canReadAll, canWriteModule } from "@/lib/access";
 import { initials, requestLabelKey } from "@/lib/directory";
 import { currentMonthKey, qatarToday } from "@/lib/hr";
 import { offerTitle, offerTotals } from "@/lib/offers";
@@ -23,12 +25,13 @@ export function OverviewScreen() {
   const t = useTranslations();
   const locale = useLocale();
   const { profile } = useAuth();
+  const { level } = usePermissions();
   const { users, requests } = useDirectory();
   const { reports, canView: canViewReports } = useReports();
   const { offers, canView: canViewOffers } = useOffers();
   const { employees, today } = useHr();
-  const { expiring } = useDocuments();
-  const { invoices, bills, expenses, canManage: canViewAccounts } = useAccounting();
+  const { expiring, canView: canViewDocuments } = useDocuments();
+  const { invoices, bills, expenses, canView: canViewAccounts } = useAccounting();
   const role = profile?.role;
   const admin = role === "superAdmin";
   const todayKey = qatarToday();
@@ -39,7 +42,7 @@ export function OverviewScreen() {
   const activeUsers = users.filter((user) => user.status === "active");
   const roles = new Set(activeUsers.map((user) => user.role)).size;
   const sent = offers.filter((offer) => offer.status === "sent");
-  const sentTotal = sent.reduce((sum, offer) => sum + offerTotals(offer.lines, offer.discountPct).total, 0);
+  const sentTotal = sent.reduce((sum, offer) => sum + offerTotals(offer.lines, offer.discountPct, offer.packageAmount).total, 0);
   const activeEmployees = employees.filter((employee) => employee.employment === "active");
   const present = activeEmployees.filter((employee) => today[employee.id] === "present").length;
   const late = activeEmployees.filter((employee) => today[employee.id] === "late").length;
@@ -50,22 +53,22 @@ export function OverviewScreen() {
   const days = Array.from({ length: 7 }, (_, index) => shiftDate(todayKey, index - 6));
   const peak = Math.max(1, ...days.map((day) => reports.filter((report) => report.date === day).length));
 
-  const cards = role === "hr"
+  const cards = role === "hr" && canReadAll(level("hr"))
     ? [
         { label: t("hr.k1"), value: String(activeEmployees.length), note: t("hr.deptNote", { count: departments }) },
         { label: t("hr.k2"), value: String(present), note: t("ov.onLeave", { count: onLeave }), noteTone: "ok" as const },
         { label: t("hr.k4"), value: String(late), note: late ? t("ov.marked") : t("hr.lateNone"), noteTone: late ? "warn" as const : undefined },
         { label: t("hr.k5"), value: String(absent), note: absent ? t("ov.marked") : t("hr.absentNone"), noteTone: absent ? "danger" as const : undefined },
       ]
-    : role === "accountant"
+    : role === "accountant" && canViewAccounts
       ? [
           { label: t("acc.k2"), value: formatQar(owed(invoices), locale), note: t("fin.openNote", { count: invoices.filter((invoice) => invoice.issued && invoiceState(invoice, todayKey) !== "paid").length }) },
-          { label: t("acc.k3"), value: formatQar(payable(bills), locale), note: t("fin.billNote", { count: bills.filter((bill) => bill.paid < bill.amount).length }) },
+          { label: t("acc.k3"), value: formatQar(payable(bills, expenses), locale), note: t("fin.billNote", { count: bills.filter((bill) => bill.paid < bill.amount).length + expenses.filter((expense) => expense.paid < expense.amount).length }) },
           { label: t("fin.profit"), value: formatQar(profit.profit, locale), note: formatMonth(currentMonthKey(), locale), dark: true },
           { label: t("ov.k4"), value: String(sent.length), note: formatQar(sentTotal, locale) },
         ]
       : [
-          ...(admin ? [
+          ...(admin && canReadAll(level("users")) ? [
             { label: t("ov.k1"), value: String(requests.length), note: t("ov.waiting", { count: waiting.length }), noteTone: waiting.length ? "warn" as const : undefined },
             { label: t("ov.k2"), value: String(activeUsers.length), note: t("ov.roles", { count: roles }) },
           ] : []),
@@ -81,7 +84,7 @@ export function OverviewScreen() {
     ...(canViewReports ? weekReports.map((report) => ({ id: report.id, sort: report.date, href: `/reports/${report.id}`, icon: "report", title: projectTitle(report, locale), detail: formatDay(report.date, locale) })) : []),
     ...(canViewOffers ? sent.map((offer) => ({ id: offer.id, sort: offer.validUntil || offer.number, href: `/offers/${offer.id}`, icon: "ruler", title: `${offer.number} · ${offerTitle(offer, locale)}`, detail: offer.validUntil ? formatDay(offer.validUntil, locale) : "" })) : []),
     ...(canViewAccounts ? invoices.filter((invoice) => invoice.issued).map((invoice) => ({ id: invoice.id, sort: invoice.issuedOn, href: "/accounting", icon: "wallet", title: `${invoice.number} · ${locale === "ar" ? invoice.clientAr : invoice.clientEn}`, detail: formatDay(invoice.issuedOn, locale) })) : []),
-    ...(role === "hr" ? activeEmployees.filter((employee) => today[employee.id]).slice(0, 5).map((employee) => ({ id: employee.id, sort: employee.name, href: `/hr/${employee.id}`, icon: "brief", title: employee.name, detail: t(attendanceKey(today[employee.id])) })) : []),
+    ...(role === "hr" && canReadAll(level("hr")) ? activeEmployees.filter((employee) => today[employee.id]).slice(0, 5).map((employee) => ({ id: employee.id, sort: employee.name, href: `/hr/${employee.id}`, icon: "brief", title: employee.name, detail: t(attendanceKey(today[employee.id])) })) : []),
   ].sort((a, b) => b.sort.localeCompare(a.sort)).slice(0, 5);
 
   return (
@@ -93,10 +96,10 @@ export function OverviewScreen() {
           <p className="page-sub">{formatDay(todayKey, locale, true)}</p>
         </div>
         <div className="hstack page-actions">
-          {admin ? <Link href="/users" className="btn btn--primary"><Icon name="plus" />{t("ov.newUser")}</Link> : null}
-          {role === "engineer" ? <Link href="/reports/new" className="btn btn--primary"><Icon name="plus" />{t("rep.new")}</Link> : null}
-          {role === "accountant" ? <Link href="/accounting" className="btn btn--primary">{t("nav.accounting")}</Link> : null}
-          {role === "hr" ? <Link href="/hr" className="btn btn--primary">{t("nav.hr")}</Link> : null}
+          {role === "superAdmin" && canWriteModule(level("users")) ? <Link href="/users" className="btn btn--primary"><Icon name="plus" />{t("ov.newUser")}</Link> : null}
+          {role === "engineer" && canWriteModule(level("reports")) ? <Link href="/reports/new" className="btn btn--primary"><Icon name="plus" />{t("rep.new")}</Link> : null}
+          {role === "accountant" && canViewAccounts ? <Link href="/accounting" className="btn btn--primary">{t("nav.accounting")}</Link> : null}
+          {role === "hr" && canOpenModule(level("hr")) ? <Link href="/hr" className="btn btn--primary">{t("nav.hr")}</Link> : null}
         </div>
       </div>
       {cards.length > 0 ? (
@@ -158,10 +161,12 @@ export function OverviewScreen() {
               />
             ))}
           </div>
-          <Link href="/notifications" className="ai">
-            <Icon name="bell" />
-            <span>{expiring.length > 0 ? t("doc.expiringNote", { count: expiring.length }) : t("ntf.empty")}</span>
-          </Link>
+          {canViewDocuments ? (
+            <Link href="/notifications" className="ai">
+              <Icon name="bell" />
+              <span>{expiring.length > 0 ? t("doc.expiringNote", { count: expiring.length }) : t("ntf.empty")}</span>
+            </Link>
+          ) : null}
         </div>
       </div>
     </AppShell>

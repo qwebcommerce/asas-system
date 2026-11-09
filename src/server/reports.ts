@@ -4,7 +4,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { reportServices, workStatuses, type ReportInput, type WorkItem } from "@/lib/reports";
 import type { ActionResult } from "@/lib/directory";
-import { actor, audit, canManageReports } from "@/server/session";
+import { canReadAll, canWriteModule, seesOwn } from "@/lib/access";
+import { actor, audit, type Gate } from "@/server/session";
 import { removePrivateFile, signedReadUrl } from "@/server/blobs";
 
 function count(value: number, max: number) {
@@ -45,11 +46,23 @@ function clean(input: ReportInput): ReportInput | null {
   };
 }
 
-async function manager(idToken: string) {
+async function manager(idToken: string, reportId?: string) {
   const who = await actor(idToken);
   if ("error" in who) return who;
-  if (!canManageReports(who.role)) return { error: "rep.forbidden" as const };
+  const owner = reportId ? await reportOwner(reportId) : who.uid;
+  if (!canChangeReport(who, owner)) return { error: "rep.forbidden" as const };
   return who;
+}
+
+function canChangeReport(who: Gate, owner: string | null) {
+  const level = who.level("reports");
+  if (canWriteModule(level)) return true;
+  return seesOwn(level) && owner === who.uid;
+}
+
+async function reportOwner(reportId: string) {
+  const snap = await adminDb().collection("projectReports").doc(reportId).get();
+  return typeof snap.data()?.createdBy === "string" ? snap.data()?.createdBy : "";
 }
 
 export async function createProjectReport(idToken: string, input: ReportInput): Promise<ActionResult> {
@@ -72,7 +85,7 @@ export async function createProjectReport(idToken: string, input: ReportInput): 
 
 export async function updateProjectReport(idToken: string, reportId: string, input: ReportInput): Promise<ActionResult> {
   try {
-    const who = await manager(idToken);
+    const who = await manager(idToken, reportId);
     if ("error" in who) return { ok: false, error: who.error };
     const report = clean(input);
     if (!report) return { ok: false, error: "us.invalid" };
@@ -89,7 +102,7 @@ export async function updateProjectReport(idToken: string, reportId: string, inp
 
 export async function deleteProjectReport(idToken: string, reportId: string): Promise<ActionResult> {
   try {
-    const who = await manager(idToken);
+    const who = await manager(idToken, reportId);
     if ("error" in who) return { ok: false, error: who.error };
     const ref = adminDb().collection("projectReports").doc(reportId);
     const snap = await ref.get();
@@ -112,11 +125,12 @@ export async function deleteProjectReport(idToken: string, reportId: string): Pr
 
 export async function deleteReportFile(idToken: string, fileId: string): Promise<ActionResult> {
   try {
-    const who = await manager(idToken);
-    if ("error" in who) return { ok: false, error: who.error };
     const ref = adminDb().collection("reportFiles").doc(fileId);
     const snap = await ref.get();
     if (!snap.exists) return { ok: false, error: "us.invalid" };
+    const reportId = typeof snap.data()?.reportId === "string" ? snap.data()?.reportId : "";
+    const who = await manager(idToken, reportId);
+    if ("error" in who) return { ok: false, error: who.error };
     const path = snap.data()?.storagePath;
     await ref.delete();
     if (typeof path === "string") await removePrivateFile(path);
@@ -131,8 +145,11 @@ export async function openReportFile(idToken: string, fileId: string): Promise<{
   try {
     const who = await actor(idToken);
     if ("error" in who) return { ok: false, error: who.error };
-    if (!canManageReports(who.role) && who.role !== "accountant") return { ok: false, error: "rep.forbidden" };
     const snap = await adminDb().collection("reportFiles").doc(fileId).get();
+    const reportId = typeof snap.data()?.reportId === "string" ? snap.data()?.reportId : "";
+    const level = who.level("reports");
+    const owner = await reportOwner(reportId);
+    if (!canReadAll(level) && !(seesOwn(level) && owner === who.uid)) return { ok: false, error: "rep.forbidden" };
     const path = snap.data()?.storagePath;
     if (!snap.exists || typeof path !== "string" || !path.startsWith("project-reports/")) return { ok: false, error: "us.invalid" };
     return { ok: true, url: await signedReadUrl(path) };

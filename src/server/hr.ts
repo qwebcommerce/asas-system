@@ -5,17 +5,27 @@ import { isDepartment, type Department } from "@/lib/directory";
 import { applicantStages, attendanceStatuses, currentMonthKey, hrDocStatuses, inclusiveDays, leaveKinds, qatarToday, type ApplicantStage, type AttendanceStatus, type HrDocStatus, type LeaveKind } from "@/lib/hr";
 import { adminDb } from "@/lib/firebase-admin";
 import { removePrivateFile, signedReadUrl } from "@/server/blobs";
-import { actor, audit, canManageHr } from "@/server/session";
+import { syncDraftPayrollRuns } from "@/server/payroll-lines";
+import { canReadAll, canWriteModule, seesOwn } from "@/lib/access";
+import { actor, audit, type Gate } from "@/server/session";
 import type { ActionResult } from "@/lib/directory";
 
 function day(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
 }
 
+function writesHr(who: Gate) {
+  return canWriteModule(who.level("hr"));
+}
+
+function ownsHr(who: Gate) {
+  return seesOwn(who.level("hr"));
+}
+
 async function manager(idToken: string) {
   const who = await actor(idToken);
   if ("error" in who) return who;
-  if (!canManageHr(who.role)) return { error: "hr.forbidden" as const };
+  if (!writesHr(who)) return { error: "hr.forbidden" as const };
   return who;
 }
 
@@ -57,6 +67,7 @@ export async function createEmployee(
       createdAt: FieldValue.serverTimestamp(),
     });
     await audit("hr.employee", who.uid, ref.id, employeeId);
+    await syncDraftPayrollRuns();
     return { ok: true };
   } catch {
     return { ok: false, error: "auth.failed" };
@@ -115,6 +126,7 @@ export async function updateEmployee(
       basic: input.basic !== null && Number.isFinite(input.basic) && input.basic >= 0 ? input.basic : null,
     });
     await audit("hr.employee.update", who.uid, input.id, employeeId);
+    await syncDraftPayrollRuns();
     return { ok: true };
   } catch {
     return { ok: false, error: "auth.failed" };
@@ -213,8 +225,8 @@ export async function createLeaveRequest(idToken: string, input: { employeeId: s
     if (!employee.exists) return { ok: false, error: "us.invalid" };
     const data = employee.data() ?? {};
     const owner = typeof data.userId === "string" ? data.userId : "";
-    if (!canManageHr(who.role) && owner !== who.uid) return { ok: false, error: "hr.forbidden" };
-    const managerRole = canManageHr(who.role);
+    if (!writesHr(who) && !(ownsHr(who) && owner === who.uid)) return { ok: false, error: "hr.forbidden" };
+    const managerRole = writesHr(who);
     const ref = await adminDb().collection("leaveRequests").add({
       employeeId: input.employeeId,
       userId: owner,
@@ -250,13 +262,13 @@ export async function updateLeaveRequest(
     const snap = await ref.get();
     if (!snap.exists) return { ok: false, error: "us.invalid" };
     const current = snap.data() ?? {};
-    const managerRole = canManageHr(who.role);
-    if (!managerRole && (current.userId !== who.uid || current.status !== "pending")) return { ok: false, error: "hr.forbidden" };
+    const managerRole = writesHr(who);
+    if (!managerRole && !(ownsHr(who) && current.userId === who.uid && current.status === "pending")) return { ok: false, error: "hr.forbidden" };
     const employee = await adminDb().collection("employees").doc(input.employeeId).get();
     if (!employee.exists) return { ok: false, error: "us.invalid" };
     const data = employee.data() ?? {};
     const owner = typeof data.userId === "string" ? data.userId : "";
-    if (!managerRole && owner !== who.uid) return { ok: false, error: "hr.forbidden" };
+    if (!managerRole && !(ownsHr(who) && owner === who.uid)) return { ok: false, error: "hr.forbidden" };
     await ref.update({
       employeeId: input.employeeId,
       userId: owner,
@@ -285,7 +297,7 @@ export async function deleteLeaveRequest(idToken: string, requestId: string): Pr
     const snap = await ref.get();
     if (!snap.exists) return { ok: false, error: "us.invalid" };
     const current = snap.data() ?? {};
-    if (!canManageHr(who.role) && (current.userId !== who.uid || current.status !== "pending")) return { ok: false, error: "hr.forbidden" };
+    if (!writesHr(who) && !(ownsHr(who) && current.userId === who.uid && current.status === "pending")) return { ok: false, error: "hr.forbidden" };
     await ref.delete();
     await audit("hr.leave.delete", who.uid, requestId, "");
     return { ok: true };
@@ -633,7 +645,8 @@ export async function openStoredFile(idToken: string, kind: "employee" | "hr", r
     const data = snap.data() ?? {};
     const path = typeof data.storagePath === "string" ? data.storagePath : "";
     if (!path) return { ok: false, error: "us.invalid" };
-    const allowed = canManageHr(who.role) || who.role === "accountant" || (kind === "employee" && data.userId === who.uid);
+    const level = who.level("hr");
+    const allowed = canReadAll(level) || (kind === "employee" && seesOwn(level) && data.userId === who.uid);
     if (!allowed) return { ok: false, error: "hr.forbidden" };
     return { ok: true, url: await signedReadUrl(path) };
   } catch {

@@ -9,7 +9,7 @@ import { usePayroll } from "@/components/use-payroll";
 import { Modal, Toast } from "@/components/ui/overlay";
 import { currentMonthKey } from "@/lib/hr";
 import { lineNet, payMethods, runTotals, type PayMethod, type PayrollLine, type PayrollRun, type PayrollStatus } from "@/lib/payroll";
-import { approvePayrollRun, createPayrollRun, deletePayrollRun, payPayrollRun, reopenPayrollRun, updatePayrollRun } from "@/server/payroll";
+import { approvePayrollRun, createPayrollRun, deletePayrollRun, payPayrollRun, refreshPayrollDrafts, reopenPayrollRun, updatePayrollRun } from "@/server/payroll";
 
 export function PayrollScreen() {
   const t = useTranslations();
@@ -25,6 +25,7 @@ export function PayrollScreen() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState<{ title: string; detail: string } | null>(null);
   const editingMonth = useRef<string | null>(null);
+  const refreshed = useRef(false);
   const run = runs.find((item) => item.id === selected) ?? null;
   const lines = draft ?? run?.lines ?? [];
   const editable = Boolean(run && run.status === "draft" && canManage);
@@ -41,6 +42,12 @@ export function PayrollScreen() {
   }, [ready, runs, selected]);
 
   useEffect(() => {
+    if (!ready || !canManage || refreshed.current) return;
+    refreshed.current = true;
+    void getToken().then((token) => refreshPayrollDrafts(token));
+  }, [canManage, getToken, ready]);
+
+  useEffect(() => {
     const current = runs.find((item) => item.id === selected) ?? null;
     if (!current) {
       editingMonth.current = null;
@@ -53,7 +60,14 @@ export function PayrollScreen() {
       setMethod(current.lines.some((line) => line.method === "bank") ? "bank" : "cash");
       return;
     }
-    if (current.status !== "draft") setDraft(current.lines.map((line) => ({ ...line })));
+    if (current.status !== "draft") {
+      setDraft(current.lines.map((line) => ({ ...line })));
+      return;
+    }
+    setDraft((draft) => {
+      const merged = mergeLines(draft, current.lines);
+      return sameLines(draft, merged) ? draft : merged;
+    });
   }, [runs, selected]);
 
   function notify(title: string, detail: string) {
@@ -366,6 +380,30 @@ function formatNumber(value: number, locale: string) {
 
 function formatQar(amount: number, locale: string) {
   return new Intl.NumberFormat(locale, { style: "currency", currency: "QAR", numberingSystem: "latn", maximumFractionDigits: 0 }).format(amount);
+}
+
+function mergeLines(draft: PayrollLine[] | null, next: PayrollLine[]) {
+  const edited = new Map((draft ?? []).map((line) => [line.employeeId, line]));
+  return next.map((line) => {
+    const current = edited.get(line.employeeId);
+    if (!current) return { ...line };
+    return { ...line, allowance: current.allowance, deduction: current.deduction, method: current.method };
+  });
+}
+
+function sameLines(left: PayrollLine[] | null, right: PayrollLine[]) {
+  if (!left || left.length !== right.length) return false;
+  return left.every((line, index) => {
+    const other = right[index];
+    return other
+      && line.employeeId === other.employeeId
+      && line.basic === other.basic
+      && line.allowance === other.allowance
+      && line.deduction === other.deduction
+      && line.method === other.method
+      && line.name === other.name
+      && line.code === other.code;
+  });
 }
 
 function exportRun(month: string, lines: PayrollLine[]) {

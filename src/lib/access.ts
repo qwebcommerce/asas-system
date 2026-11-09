@@ -49,6 +49,34 @@ export function mapMatrix(data: Record<string, unknown> | undefined): RoleMatrix
   return next;
 }
 
+export function roleLevel(matrix: RoleMatrix, role: string, module: MatrixModule): PermissionLevel {
+  if (role === "superAdmin") return "full";
+  if (!isMatrixRole(role) || role === "ceo") return "none";
+  return matrix[role][module];
+}
+
+export function canOpenModule(level: PermissionLevel) {
+  return level !== "none";
+}
+
+export function canReadAll(level: PermissionLevel) {
+  return level === "full" || level === "view" || level === "approve";
+}
+
+export function seesOwn(level: PermissionLevel) {
+  return level === "own" || level === "request";
+}
+
+export function canWriteModule(level: PermissionLevel) {
+  return level === "full";
+}
+
+export function moduleVisible(module: MatrixModule, level: PermissionLevel) {
+  if (module === "email") return false;
+  if (module === "users" || module === "accounting" || module === "payroll") return canReadAll(level);
+  return canOpenModule(level);
+}
+
 export function levelKey(level: PermissionLevel) {
   if (level === "full") return "sample.lvlFull";
   if (level === "view") return "sample.lvlView";

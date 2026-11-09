@@ -3,17 +3,21 @@
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/components/auth-provider";
+import { usePermissions } from "@/components/permissions-provider";
+import { canReadAll } from "@/lib/access";
 import { firebaseDb } from "@/lib/firebase-client";
 import { mapRequest, mapUser, type AccessRequest, type DirectoryUser } from "@/lib/directory";
 
 export function useDirectory() {
   const { user, profile, configured } = useAuth();
+  const { ready: accessReady, level } = usePermissions();
+  const seeUsers = canReadAll(level("users"));
   const [users, setUsers] = useState<DirectoryUser[]>([]);
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!configured || !user || !profile) {
+    if (!configured || !user || !profile || !accessReady) {
       setUsers([]);
       setRequests([]);
       setReady(Boolean(configured && !user));
@@ -22,7 +26,7 @@ export function useDirectory() {
 
     const db = firebaseDb();
     const usersUnsub =
-      profile.role === "superAdmin"
+      seeUsers
         ? onSnapshot(collection(db, "users"), (snap) => {
             setUsers(snap.docs.map((item) => mapUser(item.id, item.data())).sort((a, b) => a.name.localeCompare(b.name)));
             setReady(true);
@@ -50,7 +54,7 @@ export function useDirectory() {
       usersUnsub?.();
       requestsUnsub();
     };
-  }, [configured, user, profile]);
+  }, [accessReady, configured, profile, seeUsers, user]);
 
   return { users, requests, ready };
 }

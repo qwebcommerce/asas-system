@@ -22,7 +22,7 @@ export function HrScreen() {
   const locale = useLocale();
   const { profile, getToken } = useAuth();
   const { users } = useDirectory();
-  const { employees, leaves, jobs, applicants, documents, reports, today, ready, canManage, canViewAll } = useHr();
+  const { employees, leaves, jobs, applicants, documents, reports, today, ready, canManage, canViewAll, canOpen } = useHr();
   const [tab, setTab] = useState("employees");
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
@@ -70,6 +70,10 @@ export function HrScreen() {
     setError("");
     notify(title, detail);
     return true;
+  }
+
+  if (ready && !canOpen) {
+    return <AppShell title={t("hr.title")}><p className="muted">{t("common.forbidden")}</p></AppShell>;
   }
 
   return (

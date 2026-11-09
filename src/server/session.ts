@@ -1,7 +1,14 @@
 import { FieldValue } from "firebase-admin/firestore";
+import { mapMatrix, roleLevel, type MatrixModule, type PermissionLevel } from "@/lib/access";
 import { adminAuth, adminDb, isAdminConfigured } from "@/lib/firebase-admin";
 
-export async function actor(idToken: string): Promise<{ uid: string; role: string } | { error: string }> {
+export type Gate = {
+  uid: string;
+  role: string;
+  level: (module: MatrixModule) => PermissionLevel;
+};
+
+export async function actor(idToken: string): Promise<Gate | { error: string }> {
   if (!isAdminConfigured()) return { error: "auth.notConfigured" };
   try {
     const decoded = await adminAuth().verifyIdToken(idToken);
@@ -9,7 +16,10 @@ export async function actor(idToken: string): Promise<{ uid: string; role: strin
     if (!snap.exists) return { error: "auth.notInDirectory" };
     const data = snap.data() ?? {};
     if (data.status === "disabled") return { error: "auth.disabled" };
-    return { uid: decoded.uid, role: typeof data.role === "string" ? data.role : "" };
+    const role = typeof data.role === "string" ? data.role : "";
+    const matrixSnap = await adminDb().collection("settings").doc("roleMatrix").get();
+    const matrix = mapMatrix(matrixSnap.exists ? matrixSnap.data() : undefined);
+    return { uid: decoded.uid, role, level: (module) => roleLevel(matrix, role, module) };
   } catch {
     return { error: "auth.failed" };
   }
@@ -25,22 +35,3 @@ export async function audit(action: string, actorId: string, targetId: string, d
   });
 }
 
-export function canManageHr(role: string) {
-  return role === "superAdmin" || role === "hr";
-}
-
-export function canManageReports(role: string) {
-  return role === "superAdmin" || role === "engineer";
-}
-
-export function canManageOffers(role: string) {
-  return role === "superAdmin" || role === "engineer";
-}
-
-export function canManagePayroll(role: string) {
-  return role === "superAdmin" || role === "accountant";
-}
-
-export function canManageAccounting(role: string) {
-  return role === "superAdmin" || role === "accountant";
-}
