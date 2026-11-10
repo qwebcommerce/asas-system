@@ -488,6 +488,8 @@
     "rejected": "Rejected",
     "expired": "Expired",
     "m2": "m²",
+    "shapeWalls": "Walls",
+    "shapeArea": "Floor or ceiling",
     "lm": "Linear m",
     "pcs": "Pieces",
     "set": "Set",

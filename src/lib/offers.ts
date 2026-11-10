@@ -1,11 +1,13 @@
 export const offerStatuses = ["draft", "sent", "accepted", "rejected", "expired"] as const;
 export const offerTrades = ["paint", "gyp", "floor", "kitchen"] as const;
 export const offerUnits = ["m2", "lm", "pcs", "set"] as const;
+export const measureShapes = ["walls", "area", "length", "count"] as const;
 export const offerKinds = ["finishing", "architecture"] as const;
 
 export type OfferStatus = (typeof offerStatuses)[number];
 export type OfferTrade = (typeof offerTrades)[number];
 export type OfferUnit = (typeof offerUnits)[number];
+export type MeasureShape = (typeof measureShapes)[number];
 export type OfferKind = (typeof offerKinds)[number];
 
 export type OfferStage = {
@@ -47,14 +49,15 @@ export type PriceItem = {
   nameEn: string;
   nameAr: string;
   unit: OfferUnit;
+  shape: MeasureShape;
   rate: number;
 };
 
 export const priceList: PriceItem[] = [
-  { id: "paint", trade: "paint", nameEn: "Painting", nameAr: "دهان", unit: "m2", rate: 28 },
-  { id: "gyp", trade: "gyp", nameEn: "Gypsum ceiling", nameAr: "سقف جبس", unit: "m2", rate: 95 },
-  { id: "floor", trade: "floor", nameEn: "Porcelain flooring", nameAr: "أرضية بورسلان", unit: "m2", rate: 165 },
-  { id: "kitchen", trade: "kitchen", nameEn: "Kitchen cabinets", nameAr: "خزائن المطبخ", unit: "lm", rate: 2400 },
+  { id: "paint", trade: "paint", nameEn: "Painting", nameAr: "دهان", unit: "m2", shape: "walls", rate: 28 },
+  { id: "gyp", trade: "gyp", nameEn: "Gypsum ceiling", nameAr: "سقف جبس", unit: "m2", shape: "area", rate: 95 },
+  { id: "floor", trade: "floor", nameEn: "Porcelain flooring", nameAr: "أرضية بورسلان", unit: "m2", shape: "area", rate: 165 },
+  { id: "kitchen", trade: "kitchen", nameEn: "Kitchen cabinets", nameAr: "خزائن المطبخ", unit: "lm", shape: "length", rate: 2400 },
 ];
 
 export type OfferLine = {
@@ -69,6 +72,7 @@ export type OfferLine = {
   h: number | null;
   qty: number;
   unit: OfferUnit;
+  shape: MeasureShape;
   rate: number;
 };
 
@@ -124,21 +128,32 @@ export function priceById(id: string) {
   return priceList.find((item) => item.id === id) ?? null;
 }
 
-export function measureQty(unit: OfferUnit, l: number | null, w: number | null, h: number | null, qty: number) {
+export function defaultShape(unit: OfferUnit, trade?: OfferTrade): MeasureShape {
+  if (unit === "pcs" || unit === "set") return "count";
+  if (unit === "lm") return "length";
+  return trade === "paint" ? "walls" : "area";
+}
+
+export function inferShape(unit: OfferUnit, trade: OfferTrade | undefined, h: number | null, stored: unknown): MeasureShape {
+  if (unit === "pcs" || unit === "set") return "count";
+  if (unit === "lm") return "length";
+  if (stored === "walls" || stored === "area") return stored;
+  if (h && h > 0) return "walls";
+  return trade === "paint" ? "walls" : "area";
+}
+
+export function measureQty(shape: MeasureShape, l: number | null, w: number | null, h: number | null, qty: number) {
   const length = l ?? 0;
   const width = w ?? 0;
   const height = h ?? 0;
-  if (unit === "m2") {
-    if (height > 0 && length > 0 && width > 0) return round1(2 * (length + width) * height);
-    if (length > 0 && width > 0) return round1(length * width);
-    return 0;
-  }
-  if (unit === "lm") return round1(length);
+  if (shape === "walls") return length > 0 && width > 0 && height > 0 ? round1(2 * (length + width) * height) : 0;
+  if (shape === "area") return length > 0 && width > 0 ? round1(length * width) : 0;
+  if (shape === "length") return round1(length);
   return round1(qty);
 }
 
-export function lineAmount(line: Pick<OfferLine, "unit" | "l" | "w" | "h" | "qty" | "rate">) {
-  return Math.round(measureQty(line.unit, line.l, line.w, line.h, line.qty) * line.rate);
+export function lineAmount(line: Pick<OfferLine, "shape" | "l" | "w" | "h" | "qty" | "rate">) {
+  return Math.round(measureQty(line.shape, line.l, line.w, line.h, line.qty) * line.rate);
 }
 
 export function offerTotals(lines: OfferLine[], discountPct: number, packageAmount = 0) {
@@ -227,6 +242,7 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
       h: dim(row.h),
       qty: storedQty,
       unit,
+      shape: inferShape(unit, trade, dim(row.h), row.shape),
       rate,
     }];
   }) : [];

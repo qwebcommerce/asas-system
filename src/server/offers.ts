@@ -3,7 +3,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import type { ActionResult } from "@/lib/directory";
 import { qatarToday } from "@/lib/hr";
-import { measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
+import { inferShape, measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
 import { adminDb } from "@/lib/firebase-admin";
 import { canWriteModule, seesOwn } from "@/lib/access";
 import { actor, audit, type Gate } from "@/server/session";
@@ -38,8 +38,12 @@ function clean(input: OfferInput): OfferInput | string {
     const h = dim(line.h);
     if ((line.l !== null && l === null) || (line.w !== null && w === null) || (line.h !== null && h === null)) return "us.invalid";
     const unit = offerUnits.find((entry) => entry === line.unit) ?? price.unit;
-    const qty = measureQty(unit, l, w, h, line.qty);
-    if ((unit === "pcs" || unit === "set") && (!Number.isFinite(line.qty) || line.qty < 0 || line.qty > 100_000)) return "us.invalid";
+    const shape = inferShape(unit, price.trade, h, line.shape);
+    const usedL = shape === "count" ? null : l;
+    const usedW = shape === "walls" || shape === "area" ? w : null;
+    const usedH = shape === "walls" ? h : null;
+    const qty = measureQty(shape, usedL, usedW, usedH, line.qty);
+    if (shape === "count" && (!Number.isFinite(line.qty) || line.qty < 0 || line.qty > 100_000)) return "us.invalid";
     lines.push({
       roomEn,
       roomAr,
@@ -47,11 +51,12 @@ function clean(input: OfferInput): OfferInput | string {
       workEn: price.nameEn,
       workAr: price.nameAr,
       trade: price.trade,
-      l,
-      w,
-      h,
+      l: usedL,
+      w: usedW,
+      h: usedH,
       qty,
       unit,
+      shape,
       rate: Math.round(line.rate * 100) / 100,
     });
   }

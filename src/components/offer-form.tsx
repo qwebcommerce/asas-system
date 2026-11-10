@@ -9,7 +9,7 @@ import { useOffers } from "@/components/use-offers";
 import { Toast } from "@/components/ui/overlay";
 import { Link, useRouter } from "@/i18n/navigation";
 import { qatarToday } from "@/lib/hr";
-import { architectureStages, defaultPayments, lineAmount, measureQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, offerTrades, offerUnits, paymentAmounts, priceById, priceList, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit } from "@/lib/offers";
+import { architectureStages, defaultShape, defaultPayments, lineAmount, measureQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, offerTrades, offerUnits, paymentAmounts, priceById, priceList, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit } from "@/lib/offers";
 import { createOffer, updateOffer } from "@/server/offers";
 
 const savedFlag = "asas-offer-saved";
@@ -20,6 +20,7 @@ type DraftLine = {
   roomAr: string;
   priceId: string;
   unit: OfferUnit;
+  shape: MeasureShape;
   l: string;
   w: string;
   h: string;
@@ -290,7 +291,7 @@ function Editor({ initial }: { initial: Offer | null }) {
                 {visible.length === 0 ? <tr><td colSpan={10}>{t("off.emptyLines")}</td></tr> : null}
                 {visible.map((line) => {
                   const measuredLine = toLine(line);
-                  const qty = measuredLine ? measureQty(measuredLine.unit, measuredLine.l, measuredLine.w, measuredLine.h, measuredLine.qty) : 0;
+                  const qty = measuredLine ? measureQty(measuredLine.shape, measuredLine.l, measuredLine.w, measuredLine.h, measuredLine.qty) : 0;
                   const amount = measuredLine ? lineAmount(measuredLine) : 0;
                   return (
                     <tr key={line.key}>
@@ -308,6 +309,7 @@ function Editor({ initial }: { initial: Offer | null }) {
                               priceId: event.target.value,
                               rate: next ? String(next.rate) : line.rate,
                               unit: next?.unit ?? line.unit,
+                              shape: next?.shape ?? defaultShape(line.unit, priceById(line.priceId)?.trade),
                             });
                           }}
                         >
@@ -315,15 +317,24 @@ function Editor({ initial }: { initial: Offer | null }) {
                         </select>
                       </td>
                       <td data-label={t("col.unit")}>
-                        <select className="select" value={line.unit} onChange={(event) => updateLine(line.key, { unit: event.target.value as OfferUnit })}>
+                        <select className="select" value={line.unit} onChange={(event) => {
+                          const unit = event.target.value as OfferUnit;
+                          updateLine(line.key, { unit, shape: defaultShape(unit, priceById(line.priceId)?.trade) });
+                        }}>
                           {offerUnits.map((unit) => <option key={unit} value={unit}>{t(`off.${unit}`)}</option>)}
                         </select>
+                        {line.unit === "m2" ? (
+                          <select className="select" value={line.shape === "walls" ? "walls" : "area"} onChange={(event) => updateLine(line.key, { shape: event.target.value as MeasureShape })} style={{ marginTop: 6 }}>
+                            <option value="area">{t("off.shapeArea")}</option>
+                            <option value="walls">{t("off.shapeWalls")}</option>
+                          </select>
+                        ) : null}
                       </td>
-                      <td data-label="L"><input className="input num" type="number" min={0} step="0.01" value={line.l} onChange={(event) => updateLine(line.key, { l: event.target.value })} /></td>
-                      <td data-label="W"><input className="input num" type="number" min={0} step="0.01" value={line.w} onChange={(event) => updateLine(line.key, { w: event.target.value })} /></td>
-                      <td data-label="H"><input className="input num" type="number" min={0} step="0.01" value={line.h} onChange={(event) => updateLine(line.key, { h: event.target.value })} /></td>
+                      <td data-label="L">{line.shape === "count" ? <span className="muted">—</span> : <input className="input num" type="number" min={0} step="0.01" value={line.l} onChange={(event) => updateLine(line.key, { l: event.target.value })} />}</td>
+                      <td data-label="W">{line.shape === "walls" || line.shape === "area" ? <input className="input num" type="number" min={0} step="0.01" value={line.w} onChange={(event) => updateLine(line.key, { w: event.target.value })} /> : <span className="muted">—</span>}</td>
+                      <td data-label="H">{line.shape === "walls" ? <input className="input num" type="number" min={0} step="0.01" value={line.h} onChange={(event) => updateLine(line.key, { h: event.target.value })} /> : <span className="muted">—</span>}</td>
                       <td data-label={t("col.qty")} className="num strong">
-                        {line.unit === "pcs" || line.unit === "set" ? (
+                        {line.shape === "count" ? (
                           <input className="input num" type="number" min={0} step="0.1" value={line.qty} onChange={(event) => updateLine(line.key, { qty: event.target.value })} />
                         ) : <bdi>{formatQty(qty, locale)}</bdi>}
                       </td>
@@ -459,7 +470,7 @@ function readArea(value: string) {
 
 function blankLine(priceId = "paint"): DraftLine {
   const price = priceById(priceId);
-  return { key: crypto.randomUUID(), roomEn: "", roomAr: "", priceId: price?.id ?? "paint", unit: price?.unit ?? "m2", l: "", w: "", h: "", qty: "", rate: String(price?.rate ?? 0) };
+  return { key: crypto.randomUUID(), roomEn: "", roomAr: "", priceId: price?.id ?? "paint", unit: price?.unit ?? "m2", shape: price?.shape ?? "walls", l: "", w: "", h: "", qty: "", rate: String(price?.rate ?? 0) };
 }
 
 function toDraft(line: OfferLine): DraftLine {
@@ -469,6 +480,7 @@ function toDraft(line: OfferLine): DraftLine {
     roomAr: line.roomAr,
     priceId: line.priceId,
     unit: line.unit,
+    shape: line.shape,
     l: line.l === null ? "" : String(line.l),
     w: line.w === null ? "" : String(line.w),
     h: line.h === null ? "" : String(line.h),
@@ -494,6 +506,7 @@ function toLine(line: DraftLine): OfferLine | null {
     h: optionalNumber(line.h),
     qty: optionalNumber(line.qty) ?? 0,
     unit: line.unit,
+    shape: line.shape,
     rate,
   };
 }
