@@ -96,10 +96,14 @@ export function WebsiteScreen() {
 
   async function confirmRemove() {
     if (!removing) return;
-    const token = await getToken();
-    const result = removing.kind === "posts" ? await deleteBlogPost(token, removing.id) : await deleteSiteDocument(token, removing.id);
-    if (!result.ok) setError(t(result.error));
-    else notify(t("web.removed"), removing.title);
+    try {
+      const token = await getToken();
+      const result = removing.kind === "posts" ? await deleteBlogPost(token, removing.id) : await deleteSiteDocument(token, removing.id);
+      if (!result.ok) setError(t(result.error));
+      else notify(t("web.removed"), removing.title);
+    } catch {
+      setError(t("web.requestFailed"));
+    }
     setRemoving(null);
   }
 
@@ -407,6 +411,16 @@ function PostForm({
   }
 
   async function save() {
+    try {
+      await saveChanges();
+    } catch {
+      // The request itself failed (network, or the server refused it)
+      setSaving(false);
+      setFailure(t("web.requestFailed"));
+    }
+  }
+
+  async function saveChanges() {
     if (saving || !validate()) return;
     setSaving(true);
     setFailure("");
@@ -794,6 +808,16 @@ function DocumentForm({
   }
 
   async function save() {
+    try {
+      await saveChanges();
+    } catch {
+      // The request itself failed (network, or the server refused it)
+      setSaving(false);
+      setFailure(t("web.requestFailed"));
+    }
+  }
+
+  async function saveChanges() {
     if (saving || !validate()) return;
     setSaving(true);
     setFailure("");
