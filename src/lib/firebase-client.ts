@@ -1,6 +1,7 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 export function isFirebaseConfigured() {
   return Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY && process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID && process.env.NEXT_PUBLIC_FIREBASE_APP_ID);
@@ -24,4 +25,8 @@ export function firebaseAuth(): Auth {
 
 export function firebaseDb(): Firestore {
   return getFirestore(app());
+}
+
+export function firebaseStorage(): FirebaseStorage {
+  return getStorage(app());
 }

@@ -1421,6 +1421,8 @@
     "fileNameLength": "Use 3 to {max} characters.",
     "fileNameChars": "Use letters, numbers, spaces, dots, hyphens or underscores, starting with a letter or number.",
     "forbidden": "You do not have permission to manage the website.",
-    "requestFailed": "The server did not accept the request, so nothing was saved. Reload the page and try again; if it keeps happening, ask your administrator to check the server log."
+    "requestFailed": "The server did not accept the request, so nothing was saved. Reload the page and try again; if it keeps happening, ask your administrator to check the server log.",
+    "uploading": "Uploading… {percent}%",
+    "uploadFailed": "The PDF could not be uploaded. Check your connection and try again."
   }
 }

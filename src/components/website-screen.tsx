@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ref as storageRef, uploadBytesResumable } from "firebase/storage";
 import { useLocale, useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -9,6 +10,7 @@ import { useWebsite } from "@/components/use-website";
 import { Tabs } from "@/components/ui/data";
 import { Modal, Toast } from "@/components/ui/overlay";
 import { fileProblem, resolveStoredType } from "@/lib/files";
+import { firebaseStorage } from "@/lib/firebase-client";
 import { qatarToday } from "@/lib/hr";
 import {
   LIMITS,
@@ -20,6 +22,7 @@ import {
   pick,
   siteDocCategories,
   sitePdfProblem,
+  stagingFolder,
   stripPdf,
   suggestFileName,
   type BlogCategory,
@@ -58,8 +61,26 @@ async function looksLike(file: File, kind: "image" | "pdf") {
   return png || jpeg || webp;
 }
 
-/** Uploads a cover image or PDF to /api/website/files. Returns an error key or "". */
-async function upload(getToken: GetToken, purpose: "cover" | "document", id: string, file: File) {
+/**
+ * Uploads a document PDF straight from the browser to Storage (website/staging/<uid>/…), so files
+ * up to 10 MB never pass through the app server (hosting limits request bodies to a few MB).
+ * Returns the staged path for the document action to check and attach.
+ */
+function stagePdf(uid: string, file: File, onProgress: (percent: number) => void): Promise<string> {
+  const path = `${stagingFolder}/${uid}/${crypto.randomUUID()}.pdf`;
+  const task = uploadBytesResumable(storageRef(firebaseStorage(), path), file, { contentType: "application/pdf" });
+  return new Promise((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snap) => onProgress(snap.totalBytes ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100) : 0),
+      reject,
+      () => resolve(path),
+    );
+  });
+}
+
+/** Uploads a cover image to /api/website/files. Returns an error key or "". */
+async function upload(getToken: GetToken, purpose: "cover", id: string, file: File) {
   const body = new FormData();
   body.set("token", await getToken());
   body.set("purpose", purpose);
@@ -768,7 +789,9 @@ function DocumentForm({
   const [errors, setErrors] = useState<Errors>({});
   const [failure, setFailure] = useState("");
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   const [savedId, setSavedId] = useState("");
+  const { user } = useAuth();
 
   function set<K extends keyof SiteDocumentInput>(key: K, value: SiteDocumentInput[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -821,13 +844,35 @@ function DocumentForm({
     if (saving || !validate()) return;
     setSaving(true);
     setFailure("");
+    // 1. Only now, on save, upload the chosen PDF (browser -> Storage, with progress)
+    let staged = "";
+    if (file) {
+      if (!user) {
+        setSaving(false);
+        setFailure(t("auth.failed"));
+        return;
+      }
+      try {
+        setProgress(0);
+        staged = await stagePdf(user.uid, file, setProgress);
+      } catch {
+        setSaving(false);
+        setProgress(null);
+        setErrors((current) => ({ ...current, file: "web.uploadFailed" }));
+        return;
+      }
+      setProgress(null);
+    }
+    // 2. Save the document; the server checks the staged PDF and attaches it in the same step
     const token = await getToken();
     const id = existing?.id || savedId;
     const input = { ...form, fileName: stripPdf(form.fileName.trim()) };
-    const result = id ? await updateSiteDocument(token, id, input) : await createSiteDocument(token, input);
+    const result = id ? await updateSiteDocument(token, id, input, staged) : await createSiteDocument(token, input, staged);
     if (!result.ok || !result.id) {
       setSaving(false);
-      setFailure(t(result.ok ? "auth.failed" : result.error));
+      const key = result.ok ? "auth.failed" : result.error;
+      if (key.startsWith("web.pdf") || key === "web.uploadFailed") setErrors((current) => ({ ...current, file: key }));
+      else setFailure(t(key));
       return;
     }
     setSavedId(result.id);
@@ -836,14 +881,6 @@ function DocumentForm({
       if (!cleared.ok) {
         setSaving(false);
         setFailure(t(cleared.error));
-        return;
-      }
-    }
-    if (file) {
-      const problem = await upload(getToken, "document", result.id, file);
-      if (problem) {
-        setSaving(false);
-        setErrors((current) => ({ ...current, file: problem }));
         return;
       }
     }
@@ -893,7 +930,7 @@ function DocumentForm({
               <b dir="ltr">{file.name}</b>
               <small className="muted">{formatBytes(file.size, locale)}</small>
             </div>
-            <button type="button" className="icon-btn file-chip__remove" aria-label={t("hr.fileRemove")} onClick={() => setFile(null)}>
+            <button type="button" className="icon-btn file-chip__remove" aria-label={t("hr.fileRemove")} disabled={saving} onClick={() => setFile(null)}>
               <Icon name="x" className="icon icon--sm" />
             </button>
           </div>
@@ -920,6 +957,11 @@ function DocumentForm({
             <input type="file" accept="application/pdf,.pdf" onChange={(e) => { const f = e.target.files?.[0] ?? null; e.currentTarget.value = ""; void choose(f); }} />
           </label>
         )}
+        {progress !== null ? (
+          <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-label={t("web.uploading", { percent: progress })}>
+            <span style={{ width: `${progress}%` }} />
+          </div>
+        ) : null}
         <small className="muted">{t("web.pdfHint")}</small>
         {errors.file ? <span className="field-error">{t(errors.file)}</span> : null}
       </div>
@@ -950,7 +992,9 @@ function DocumentForm({
       {failure ? <p style={{ color: "var(--danger)" }}>{failure}</p> : null}
       <div className="hstack" style={{ justifyContent: "flex-end" }}>
         <button type="button" className="btn btn--ghost" onClick={onClose}>{t("btn.cancel")}</button>
-        <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? t("web.saving") : existing ? t("set.save") : t("web.publish")}</button>
+        <button type="submit" className="btn btn--primary" disabled={saving}>
+          {progress !== null ? t("web.uploading", { percent: progress }) : saving ? t("web.saving") : existing ? t("set.save") : t("web.publish")}
+        </button>
       </div>
     </form>
   );

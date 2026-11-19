@@ -1,6 +1,20 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Website documents: the signed-in user's browser uploads a PDF here (up to 10 MB) when the
+    // form is saved. The server then checks the user's Website permission and the file itself,
+    // moves it to website/documents/ and deletes the staged copy. Nobody can read staged files.
+    match /website/staging/{uid}/{fileName} {
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && fileName.matches('[A-Za-z0-9-]+[.]pdf')
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow read, update, delete: if false;
+    }
+
+    // Everything else is only accessed by the server (Admin SDK).
     match /{allPaths=**} {
       allow read, write: if false;
     }
