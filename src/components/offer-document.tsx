@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
+import { ArchitectureContract, ArchitectureQuotation } from "@/components/architecture-document";
 import { Icon } from "@/components/icon";
 import { useOffers } from "@/components/use-offers";
 import { Link } from "@/i18n/navigation";
@@ -53,7 +54,15 @@ export function OfferDocument({ offerId, doc, autoPrint = false }: { offerId: st
         </button>
       </div>
       <p className="muted no-print">{t("off.printHint")}</p>
-      {doc === "contract" ? <ContractSheets offer={offer} /> : <QuotationSheets offer={offer} />}
+      {offer.kind === "architecture" ? (
+        <div className="adoc-wrap">
+          {doc === "contract" ? <ArchitectureContract offer={offer} /> : <ArchitectureQuotation offer={offer} />}
+        </div>
+      ) : doc === "contract" ? (
+        <ContractSheets offer={offer} />
+      ) : (
+        <QuotationSheets offer={offer} />
+      )}
     </AppShell>
   );
 }

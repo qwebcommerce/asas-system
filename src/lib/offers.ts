@@ -107,20 +107,22 @@ export type Offer = {
 
 export type OfferInput = Omit<Offer, "id" | "number">;
 
+/** Default payment schedule, worded as in the reference quotation. */
 export function defaultPayments(): OfferPayment[] {
   return [
-    { labelEn: "Down payment", labelAr: "الدفعة المقدمة", percent: 50, whenEn: "Upon signing this agreement", whenAr: "عند توقيع هذه الاتفاقية" },
-    { labelEn: "Second payment", labelAr: "الدفعة الثانية", percent: 25, whenEn: "Upon completion of stage one", whenAr: "عند اكتمال المرحلة الأولى" },
-    { labelEn: "Third payment", labelAr: "الدفعة الثالثة", percent: 15, whenEn: "Upon completion of stage two", whenAr: "عند اكتمال المرحلة الثانية" },
-    { labelEn: "Final payment", labelAr: "الدفعة الأخيرة", percent: 10, whenEn: "Before the final stage submission", whenAr: "قبل تسليم المرحلة الأخيرة" },
+    { labelEn: "Down Payment", labelAr: "الدفعة الأولى", percent: 50, whenEn: "Payment upon signing this Agreement", whenAr: "عند توقيع هذا العرض" },
+    { labelEn: "Second Payment", labelAr: "الدفعة الثانية", percent: 25, whenEn: "Upon completion of Stage One", whenAr: "عند الانتهاء من المرحلة الأولى" },
+    { labelEn: "Third Payment", labelAr: "الدفعة الثالثة", percent: 15, whenEn: "Upon Completion of Stage Two", whenAr: "عند الانتهاء من المرحلة الثانية" },
+    { labelEn: "Final Payment", labelAr: "الدفعة الأخيرة", percent: 10, whenEn: "Before The Final Stage Submission", whenAr: "قبل تسليم المرحلة الثالثة" },
   ];
 }
 
+/** Architecture design package, worded as in the reference quotation (one detail per line). */
 export function architectureStages(): OfferStage[] {
   return [
-    { titleEn: "Stage one", titleAr: "المرحلة الأولى", detailEn: "Architectural plans and elevation plans", detailAr: "المخططات المعمارية ومخططات الواجهات" },
-    { titleEn: "Stage two", titleAr: "المرحلة الثانية", detailEn: "Structural and MEP plans", detailAr: "المخططات الإنشائية ومخططات الخدمات" },
-    { titleEn: "Stage three", titleAr: "المرحلة الثالثة", detailEn: "3D renders", detailAr: "الإظهار الثلاثي الأبعاد" },
+    { titleEn: "Stage One", titleAr: "المرحلة الأولى", detailEn: "Architectural plans\nElevation plans", detailAr: "المخططات المعمارية\nمخططات الواجهات المعمارية" },
+    { titleEn: "Stage Two", titleAr: "المرحلة الثانية", detailEn: "Structural & MEP Plans", detailAr: "المخططات الإنشائية والخدمات" },
+    { titleEn: "Stage Three", titleAr: "المرحلة الثالثة", detailEn: "3D Renders", detailAr: "الإظهار الثلاثي الأبعاد" },
   ];
 }
 
