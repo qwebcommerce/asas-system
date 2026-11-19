@@ -12,7 +12,7 @@ async function currentYear() {
   return new Date().getFullYear();
 }
 
-export async function SiteFooter({ locale, current }: { locale: Locale; current: SitePage }) {
+export async function SiteFooter({ locale, current, path }: { locale: Locale; current: SitePage; path?: string }) {
   const t = await getTranslations({ locale, namespace: "site" });
   const year = await currentYear();
   const home = (hash: string) => sitePath(locale, "", hash);
@@ -69,7 +69,7 @@ export async function SiteFooter({ locale, current }: { locale: Locale; current:
           <span>{t("footer.copyright", { year })}</span>
           <span>
             {t("lang.current")} ·{" "}
-            <a className="alt" href={sitePath(other, PAGE_PATH[current])} lang={other} hrefLang={other}>{t("lang.other")}</a>
+            <a className="alt" href={sitePath(other, path ?? PAGE_PATH[current])} lang={other} hrefLang={other}>{t("lang.other")}</a>
           </span>
         </div>
       </div>

@@ -459,7 +459,8 @@
     "settings": "Settings",
     "signOut": "Sign out",
     "users": "Users & Access",
-    "workspace": "Workspace"
+    "workspace": "Workspace",
+    "website": "Website"
   },
   "off": {
     "addM": "Add measurement",
@@ -794,7 +795,8 @@
     "staff": "Overview · ASAS System",
     "users": "Users & Access · ASAS System",
     "email": "Email · ASAS System",
-    "forgot": "Reset password · ASAS System"
+    "forgot": "Reset password · ASAS System",
+    "website": "Website · ASAS System"
   },
   "top": {
     "ai": "Open AI assistant",
@@ -1016,7 +1018,11 @@
       "blogs": "Blogs",
       "documents": "Documents",
       "contact": "Contact",
-      "signIn": "Staff sign in"
+      "signIn": "Staff sign in",
+      "menu": "Menu",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "language": "Language"
     },
     "lang": {
       "current": "EN",
@@ -1224,27 +1230,7 @@
     "journal": {
       "label": "The ASAS journal  /  Blogs",
       "title": "Good spaces start<br></br>with good questions.",
-      "all": "Explore all blogs",
-      "stories": [
-        [
-          "01  /  Planning",
-          "Before the first drawing: a better project brief",
-          "Start with your space, your priorities and the way you want to live.",
-          "Executive office interior"
-        ],
-        [
-          "02  /  Materials",
-          "The details that make a finish feel exceptional",
-          "A closer look at texture, proportion and the meeting of materials.",
-          "Mashrabiya stone screen detail"
-        ],
-        [
-          "03  /  Construction",
-          "One team, from the first plan to the final finish",
-          "Why coordination matters at every stage of your project.",
-          "Stone cornice and columns on a villa"
-        ]
-      ]
+      "all": "Explore all blogs"
     },
     "resources": {
       "label": "The resource room  /  Documents",
@@ -1289,11 +1275,6 @@
       "intro": "Ideas, materials and practical thinking for the places we call our own.",
       "heroAlt": "Marble vanity with lit display niches",
       "heroNote": "01  /  A CLOSER LOOK AT CRAFT",
-      "featuredAlt": "Double-height living room with a floating staircase",
-      "featuredLabel": "Editor’s pick  /  Planning",
-      "featuredTitle": "Before the first<br></br>drawing, ask the<br></br>right questions.",
-      "featuredDesc": "A thoughtful brief is the foundation of a thoughtful space. Begin with the way you live, what you value and what your project needs to achieve.",
-      "featuredMeta": "ASAS INSIGHTS  ·  6 MIN READ",
       "read": "Read the story",
       "collection": "Notes from the studio.",
       "filterLabel": "Filter stories",
@@ -1307,42 +1288,10 @@
         "finishing": "Finishing"
       },
       "minRead": "{n} MIN READ",
-      "articles": [
-        [
-          "planning",
-          "A better brief for your next space",
-          "Executive office with lit shelving"
-        ],
-        [
-          "materials",
-          "Where stone meets wood",
-          "Marble bathroom with glass shower"
-        ],
-        [
-          "construction",
-          "One team. A clearer journey.",
-          "Curved staircase with lit steps"
-        ],
-        [
-          "architecture",
-          "A home shaped by light",
-          "Stone villa with balcony"
-        ],
-        [
-          "interiors",
-          "Comfort is in the details",
-          "Bright dining room"
-        ],
-        [
-          "finishing",
-          "The art of a seamless finish",
-          "Wooden slat ceiling with downlight"
-        ]
-      ],
-      "pages": "Pages",
-      "next": "Next page",
       "ctaTitle": "An idea worth building?",
-      "ctaText": "Let’s turn the inspiration into a plan for your space."
+      "ctaText": "Let’s turn the inspiration into a plan for your space.",
+      "editorsPick": "Editor’s pick",
+      "insights": "ASAS INSIGHTS"
     },
     "docs": {
       "label": "ASAS resource room  /  Documents",
@@ -1366,33 +1315,111 @@
       "ask": "Ask our team  →",
       "request": "Request copy  ↗",
       "requestSubject": "Request: {title}",
-      "items": [
-        [
-          "company",
-          "ASAS company profile",
-          "An introduction to ASAS Executive Contracting, our values and our approach."
-        ],
-        [
-          "services",
-          "Our five disciplines",
-          "Architectural plans, construction, interiors, finishing and furniture."
-        ],
-        [
-          "planning",
-          "Project brief checklist",
-          "A starting point for defining your needs, priorities, budget and timeline."
-        ],
-        [
-          "planning",
-          "Your first consultation",
-          "What to prepare before meeting the ASAS team."
-        ]
-      ],
       "contact": "For company credentials or project-specific documentation, email <link>info@asasqa.com</link>.",
       "supportTitle": "The right information.<br></br>The right next step.",
       "supportText": "Our Lusail team can help you find what you need.",
       "requestDocs": "Request documents",
-      "requestDocsSubject": "Document request"
+      "requestDocsSubject": "Document request",
+      "download": "Download PDF  ↓",
+      "downloadLabel": "Download {title} ({size})",
+      "pdfMeta": "PDF  /  {size}"
+    },
+    "post": {
+      "back": "All stories",
+      "published": "Published",
+      "readTime": "Reading time",
+      "category": "Category",
+      "share": "Share this story",
+      "shareWhatsapp": "WhatsApp",
+      "shareEmail": "Email",
+      "shareLinkedin": "LinkedIn",
+      "more": "More from the journal",
+      "moreAll": "Explore all blogs",
+      "breadcrumb": "Blogs",
+      "minutes": "{n} min"
     }
+  },
+  "web": {
+    "eyebrow": "Public website",
+    "postCount": "{count, plural, =0 {No published posts} one {# published post} other {# published posts}}",
+    "docCount": "{count, plural, =0 {no published documents} one {# published document} other {# published documents}}",
+    "viewSite": "View website",
+    "newPost": "New blog post",
+    "editPost": "Edit blog post",
+    "newDoc": "New document",
+    "editDoc": "Edit document",
+    "tabPosts": "Blog posts",
+    "tabDocs": "Documents",
+    "post": "Post",
+    "document": "Document",
+    "category": "Category",
+    "publishedOn": "Publish date",
+    "file": "File",
+    "view": "View",
+    "sample": "Sample",
+    "featured": "Featured",
+    "status": {
+      "published": "Published",
+      "draft": "Draft"
+    },
+    "cat": {
+      "planning": "Planning",
+      "construction": "Construction",
+      "interiors": "Interiors",
+      "materials": "Materials",
+      "architecture": "Architecture",
+      "finishing": "Finishing"
+    },
+    "docCat": {
+      "company": "Company",
+      "services": "Services",
+      "planning": "Planning guides"
+    },
+    "samplePosts": "No posts are published yet, so the website shows these {count} sample stories. They disappear as soon as you publish your first post.",
+    "sampleDocs": "No documents are published yet, so the website shows these {count} sample documents. They disappear as soon as you publish your first document.",
+    "onRequest": "On request (email)",
+    "noFile": "No file",
+    "title": "Title",
+    "excerpt": "Short summary",
+    "body": "Article text",
+    "description": "Description",
+    "bodyHint": "Leave an empty line between paragraphs. Start a line with “## ” for a subheading or “> ” for a highlighted quote.",
+    "readMinutes": "Reading time (minutes)",
+    "readAuto": "Auto: {count} min",
+    "featureLabel": "Feature this post at the top of the blog (Editor’s pick)",
+    "cover": "Cover image",
+    "coverAlt": "Image description",
+    "coverHint": "JPG, PNG or WebP, up to 2 MB. Landscape images around 1600 × 1000 px look best.",
+    "currentCover": "Current cover image",
+    "replaceHint": "Replace it or remove it",
+    "replace": "Replace",
+    "pdf": "PDF file",
+    "pdfHint": "PDF only, up to 10 MB. Visitors download it from the Documents page.",
+    "fileName": "Download file name",
+    "fileNameHint": "The name visitors see when they download, e.g. “ASAS Company Profile 2026”. “.pdf” is added for you.",
+    "order": "Order on the page",
+    "orderHint": "Lower numbers appear first.",
+    "publish": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "removed": "Deleted",
+    "deletePostQ": "Delete this blog post?",
+    "deleteDocQ": "Delete this document?",
+    "deleteNote": "“{title}” and its file will be removed from the system and the website. This cannot be undone.",
+    "required": "Required in this language.",
+    "titleLatin": "The English title needs Latin letters or numbers (it becomes the page address).",
+    "dateRequired": "Choose a publish date.",
+    "minutesRange": "Enter a whole number from 1 to {max}, or leave empty.",
+    "coverRequired": "Add a cover image before publishing, or save as a draft.",
+    "fileRequired": "Add a PDF before publishing, or save as a draft.",
+    "orderRange": "Enter a whole number from 0 to 999.",
+    "imageOnly": "Choose a JPG, PNG or WebP image.",
+    "imageSize": "The image is larger than 2 MB.",
+    "pdfOnly": "Choose a PDF file.",
+    "pdfSize": "The PDF is larger than 10 MB.",
+    "fileNameRequired": "Enter a file name.",
+    "fileNameLength": "Use 3 to {max} characters.",
+    "fileNameChars": "Use letters, numbers, spaces, dots, hyphens or underscores, starting with a letter or number.",
+    "forbidden": "You do not have permission to manage the website."
   }
 }

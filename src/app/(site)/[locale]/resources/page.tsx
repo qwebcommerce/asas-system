@@ -10,6 +10,8 @@ import { SiteFooter } from "@/components/site/site-footer";
 import { SiteEffects } from "@/components/site/site-effects";
 import { SiteHeader } from "@/components/site/site-header";
 import type { Locale } from "@/i18n/routing";
+import { formatBytes, siteDocCategories } from "@/lib/website";
+import { siteDocuments } from "@/server/site-content";
 
 type Params = { params: Promise<{ locale: string }> };
 
@@ -18,14 +20,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return siteMetadata(locale as Locale, "documents");
 }
 
-const CATEGORIES = ["all", "company", "services", "planning"] as const;
-
 export default async function ResourcesPage({ params }: Params) {
   const { locale: raw } = await params;
   const locale = raw as Locale;
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "site" });
-  const items = t.raw("docs.items") as [string, string, string][];
+  const { documents } = await siteDocuments(locale);
+  const categories = siteDocCategories.filter((cat) => documents.some((doc) => doc.category === cat));
 
   return (
     <>
@@ -61,7 +62,7 @@ export default async function ResourcesPage({ params }: Params) {
                   scope=".library__items"
                   buttonClass="cat"
                   label={t("docs.filterLabel")}
-                  options={CATEGORIES.map((key) => ({ key, label: t(`docs.cats.${key}`) }))}
+                  options={(["all", ...categories] as const).map((key) => ({ key, label: t(`docs.cats.${key}`) }))}
                 />
                 <div className="categories__help">
                   <b>{t("docs.help")}</b>
@@ -69,15 +70,28 @@ export default async function ResourcesPage({ params }: Params) {
                 </div>
               </aside>
               <div className="library__items">
-                {items.map(([cat, title, body], i) => (
-                  <div className="resource reveal" data-cat={cat} key={title}>
-                    <span className="resource__num">0{i + 1}</span>
+                {documents.map((doc, i) => (
+                  <div className="resource reveal" data-cat={doc.category} key={doc.key}>
+                    <span className="resource__num">{String(i + 1).padStart(2, "0")}</span>
                     <div>
-                      <p className="label">{t(`docs.cats.${cat}`)} &nbsp;/&nbsp; PDF</p>
-                      <h3>{title}</h3>
-                      <p>{body}</p>
+                      <p className="label">
+                        {t(`docs.cats.${doc.category}`)} &nbsp;/&nbsp; {doc.href ? t("docs.pdfMeta", { size: formatBytes(doc.size, locale) }) : "PDF"}
+                      </p>
+                      <h3>{doc.title}</h3>
+                      <p>{doc.description}</p>
                     </div>
-                    <a className="resource__action" href={mailto(t("docs.requestSubject", { title }))}>{t("docs.request")}</a>
+                    {doc.href ? (
+                      <a
+                        className="resource__action"
+                        href={doc.href}
+                        download={doc.fileName}
+                        aria-label={t("docs.downloadLabel", { title: doc.title, size: formatBytes(doc.size, locale) })}
+                      >
+                        {t("docs.download")}
+                      </a>
+                    ) : (
+                      <a className="resource__action" href={mailto(t("docs.requestSubject", { title: doc.title }))}>{t("docs.request")}</a>
+                    )}
                   </div>
                 ))}
                 <p className="library__contact">

@@ -21,6 +21,7 @@ const workspace = [
   { id: "documents", href: "/documents", icon: "folder" },
   { id: "accounting", href: "/accounting", icon: "wallet" },
   { id: "payroll", href: "/payroll", icon: "card" },
+  { id: "website", href: "/website", icon: "globe" },
 ] as const;
 
 export function AppShell({
