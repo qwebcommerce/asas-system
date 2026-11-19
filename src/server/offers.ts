@@ -163,7 +163,9 @@ export async function updateOffer(idToken: string, offerId: string, input: Offer
     const ref = adminDb().collection("offers").doc(offerId);
     const snap = await ref.get();
     if (!snap.exists) return { ok: false, error: "us.invalid" };
-    await ref.update({ ...offer, updatedAt: FieldValue.serverTimestamp() });
+    // The offer type is fixed once created (each type has its own fields and documents)
+    const storedKind = snap.data()?.kind;
+    await ref.update({ ...offer, kind: typeof storedKind === "string" ? storedKind : offer.kind, updatedAt: FieldValue.serverTimestamp() });
     await audit("offers.update", who.uid, offerId, typeof snap.data()?.number === "string" ? snap.data()?.number : "");
     return { ok: true };
   } catch {

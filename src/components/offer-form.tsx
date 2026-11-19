@@ -120,7 +120,8 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
   const [capacityEn, setCapacityEn] = useState(initial?.capacityEn ?? (initial ? "" : "Representative of the land and property"));
   const [capacityAr, setCapacityAr] = useState(initial?.capacityAr ?? (initial ? "" : "بصفته ممثل الارض والعقار"));
   const [reference, setReference] = useState(initial?.reference ?? "");
-  const [kind, setKind] = useState<OfferKind>(initial?.kind ?? newKind);
+  // The type is chosen before the form opens and is fixed once the offer is saved
+  const kind: OfferKind = initial?.kind ?? newKind;
   const [issuedOn, setIssuedOn] = useState(initial?.issuedOn || qatarToday());
   const [areaFrom, setAreaFrom] = useState(initial?.areaFrom == null ? "" : String(initial.areaFrom));
   const [areaTo, setAreaTo] = useState(initial?.areaTo == null ? "" : String(initial.areaTo));
@@ -277,14 +278,6 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
               <Field label={t("off.capacityAr")} value={capacityAr} onChange={setCapacityAr} />
               <Field label={t("off.projectNo")} value={reference} onChange={setReference} />
               <Field label={t("off.issuedOn")} value={issuedOn} onChange={setIssuedOn} type="date" />
-              {initial ? (
-                <div className="field">
-                  <label>{t("off.kind")}</label>
-                  <select className="select" value={kind} onChange={(event) => setKind(event.target.value as OfferKind)}>
-                    {offerKinds.map((item) => <option key={item} value={item}>{t(`off.${item}`)}</option>)}
-                  </select>
-                </div>
-              ) : null}
               <Field label={t("off.areaFrom")} value={areaFrom} onChange={setAreaFrom} type="number" />
               <Field label={t("off.areaTo")} value={areaTo} onChange={setAreaTo} type="number" />
               <Field label={t("off.packageAmount")} value={packageAmount} onChange={setPackageAmount} type="number" />
@@ -295,7 +288,7 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
           <div className="card stack">
             <div className="between">
               <h3 className="card-title">{t("off.stages")}</h3>
-              <button type="button" className="btn btn--secondary btn--sm" onClick={() => { setKind("architecture"); setStages(architectureStages().map(stageDraft)); }}>{t("off.stageTemplate")}</button>
+              <button type="button" className="btn btn--secondary btn--sm" onClick={() => setStages(architectureStages().map(stageDraft))}>{t("off.stageTemplate")}</button>
             </div>
             {stages.map((stage) => (
               <div className="stack stack--sm" key={stage.key}>
