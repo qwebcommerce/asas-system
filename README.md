@@ -46,4 +46,3 @@ The app serves two separate sites, each with its own root layout and stylesheet:
 
 The website's "Request a call" forms post to `/api/consultations`, which saves each request to the
 `consultations` Firestore collection (server-side only; superAdmins can read it). Images live in `public/site`.
-The original static HTML/CSS is kept in `ASAS-website-html-css/` as the design reference.
