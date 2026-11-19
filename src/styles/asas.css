@@ -885,3 +885,19 @@ img, svg { display: block; max-width: 100%; }
   .adoc + .adoc { margin-top: 0; }
   .adoc-wrap { overflow: visible; padding: 0; }
 }
+
+/* New offer: choose the type first */
+.kind-pick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 920px; }
+.kind-pick__item { position: relative; display: flex; align-items: flex-start; gap: 16px; padding: 22px 22px 22px 20px; color: var(--text); transition: border-color .2s var(--ease), box-shadow .2s var(--ease), transform .2s var(--ease); }
+.kind-pick__item:hover, .kind-pick__item:focus-visible { border-color: var(--text); box-shadow: var(--shadow-soft); transform: translateY(-1px); }
+.kind-pick__item .tile-icon { width: 44px; height: 44px; border-radius: 12px; }
+.kind-pick__text { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-inline-end: 34px; }
+.kind-pick__text b { font-size: var(--fs-lg); font-weight: 600; }
+.kind-pick__text small { color: var(--text-2); font-size: var(--fs-sm); line-height: 1.45; }
+.kind-pick__num { position: absolute; top: 18px; inset-inline-end: 20px; font-size: 12px; color: var(--text-3); }
+.kind-pick__go { position: absolute; bottom: 20px; inset-inline-end: 20px; color: var(--text-3); }
+.kind-pick__item:hover .kind-pick__go { color: var(--text); }
+.kind-chosen { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+@media (max-width: 720px) {
+  .kind-pick { grid-template-columns: 1fr; }
+}

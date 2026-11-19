@@ -10,8 +10,16 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return { title: t("offer") };
 }
 
-export default async function NewOfferPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function NewOfferPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ type?: string }>;
+}) {
   const { locale } = await params;
+  const { type } = await searchParams;
   setRequestLocale(locale);
-  return <OfferForm />;
+  // Without a valid ?type= the form first asks which kind of offer to create
+  return <OfferForm key={type ?? "pick"} type={type} />;
 }

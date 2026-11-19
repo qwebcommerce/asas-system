@@ -505,7 +505,7 @@
     "issuedOn": "Date",
     "kind": "Offer type",
     "finishing": "Finishing",
-    "architecture": "Architecture",
+    "architecture": "Architectural design",
     "area": "Total area",
     "areaFrom": "Area from m²",
     "areaTo": "Area to m²",
@@ -561,7 +561,19 @@
     "summary": "Offer summary",
     "title": "New offer",
     "total": "Total",
-    "valid": "Valid for 30 days · prices exclude furniture"
+    "valid": "Valid for 30 days · prices exclude furniture",
+    "fitout": "Fit-out",
+    "interior": "Interior design",
+    "construction": "Construction",
+    "pickTitle": "What kind of offer is this?",
+    "pickSub": "Choose the type of work first. The form then opens with the right sections and documents for it.",
+    "changeType": "Change type",
+    "pick": {
+      "architecture": "Architectural, structural and MEP plans with 3D renders, priced as a design package.",
+      "fitout": "Painting, gypsum, flooring and joinery, measured and priced room by room.",
+      "interior": "Interior concepts, materials, lighting and furniture for homes and offices.",
+      "construction": "Building works for new projects and extensions, from structure to handover."
+    }
   },
   "ov": {
     "activity": "Recent activity",
