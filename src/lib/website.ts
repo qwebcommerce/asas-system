@@ -24,8 +24,14 @@ export const LIMITS = {
   readMinutes: 60,
 } as const;
 
-/** Public documents must be PDFs of at most 10 MB. */
+/** Public documents must be PDFs of at most 10 MB (kept in step with storage.rules). */
 export const siteDocBytes = 10 * 1024 * 1024;
+
+/**
+ * PDFs go from the browser straight to Storage under <stagingFolder>/<uid>/<id>.pdf
+ * (too large to pass through the app's server), then the server checks and moves them.
+ */
+export const stagingFolder = "website/staging";
 
 export type BlogPost = {
   id: string;

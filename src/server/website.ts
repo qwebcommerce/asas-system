@@ -1,10 +1,11 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { updateTag } from "next/cache";
 import { FieldValue } from "firebase-admin/firestore";
 import { canReadAll, canWriteModule } from "@/lib/access";
 import type { ActionResult } from "@/lib/directory";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminBucket, adminDb } from "@/lib/firebase-admin";
 import {
   LIMITS,
   blogCategories,
@@ -12,6 +13,8 @@ import {
   fileNameProblem,
   isDay,
   publishStates,
+  siteDocBytes,
+  stagingFolder,
   siteDocCategories,
   slugify,
   stripPdf,
@@ -97,6 +100,31 @@ function fail(error: string): Fail {
   return { ok: false, error };
 }
 
+/**
+ * Takes a PDF the browser uploaded straight to Storage (website/staging/<uid>/…, allowed by
+ * storage.rules), checks it really is this user's PDF within the size limit, and moves it to
+ * the document's folder. The staged copy is always removed, whatever the outcome.
+ */
+async function attachStagedPdf(uid: string, stagedPath: string, documentId: string): Promise<{ path: string; size: number } | { error: string }> {
+  const prefix = `${stagingFolder}/${uid}/`;
+  if (!stagedPath.startsWith(prefix) || !/^[A-Za-z0-9-]+\.pdf$/.test(stagedPath.slice(prefix.length))) return { error: "us.invalid" };
+  const staged = adminBucket().file(stagedPath);
+  try {
+    const [exists] = await staged.exists();
+    if (!exists) return { error: "web.uploadFailed" };
+    const [meta] = await staged.getMetadata();
+    const size = Number(meta.size);
+    if (!Number.isFinite(size) || size <= 0 || size > siteDocBytes) return { error: "web.pdfSize" };
+    const [head] = await staged.download({ start: 0, end: 4 });
+    if (head.toString("latin1") !== "%PDF-") return { error: "web.pdfOnly" };
+    const path = `website/documents/${documentId}/${randomUUID()}.pdf`;
+    await staged.copy(adminBucket().file(path), { metadata: { contentType: "application/pdf", cacheControl: "private, max-age=3600" } });
+    return { path, size };
+  } finally {
+    await staged.delete({ ignoreNotFound: true }).catch(() => undefined);
+  }
+}
+
 // ---------- Blog posts ----------
 
 export async function createBlogPost(idToken: string, input: BlogPostInput): Promise<ActionResult> {
@@ -180,17 +208,22 @@ export async function clearBlogCover(idToken: string, postId: string): Promise<A
 
 // ---------- Public documents ----------
 
-export async function createSiteDocument(idToken: string, input: SiteDocumentInput): Promise<ActionResult> {
+export async function createSiteDocument(idToken: string, input: SiteDocumentInput, stagedPdf = ""): Promise<ActionResult> {
   try {
     const who = await gate(idToken, true);
     if ("error" in who) return fail(who.error);
     const doc = cleanDocument(input);
     if (!doc) return fail("us.invalid");
-    const ref = await adminDb().collection(DOCS).add({
+    const ref = adminDb().collection(DOCS).doc();
+    let file = { storagePath: "", contentType: "", size: 0 };
+    if (stagedPdf) {
+      const attached = await attachStagedPdf(who.uid, stagedPdf, ref.id);
+      if ("error" in attached) return fail(attached.error);
+      file = { storagePath: attached.path, contentType: "application/pdf", size: attached.size };
+    }
+    await ref.set({
       ...doc,
-      storagePath: "",
-      contentType: "",
-      size: 0,
+      ...file,
       createdBy: who.uid,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -202,15 +235,24 @@ export async function createSiteDocument(idToken: string, input: SiteDocumentInp
   }
 }
 
-export async function updateSiteDocument(idToken: string, documentId: string, input: SiteDocumentInput): Promise<ActionResult> {
+export async function updateSiteDocument(idToken: string, documentId: string, input: SiteDocumentInput, stagedPdf = ""): Promise<ActionResult> {
   try {
     const who = await gate(idToken, true);
     if ("error" in who) return fail(who.error);
     const doc = cleanDocument(input);
     if (!doc) return fail("us.invalid");
     const ref = adminDb().collection(DOCS).doc(documentId);
-    if (!(await ref.get()).exists) return fail("us.invalid");
-    await ref.update({ ...doc, updatedAt: FieldValue.serverTimestamp() });
+    const snap = await ref.get();
+    if (!snap.exists) return fail("us.invalid");
+    let file = {};
+    const previous = typeof snap.data()?.storagePath === "string" ? (snap.data()?.storagePath as string) : "";
+    if (stagedPdf) {
+      const attached = await attachStagedPdf(who.uid, stagedPdf, documentId);
+      if ("error" in attached) return fail(attached.error);
+      file = { storagePath: attached.path, contentType: "application/pdf", size: attached.size };
+    }
+    await ref.update({ ...doc, ...file, updatedAt: FieldValue.serverTimestamp() });
+    if (stagedPdf && previous) await removePrivateFile(previous);
     await audit("website.document.update", who.uid, documentId, doc.titleEn);
     updateTag(SITE_TAG);
     return { ok: true, id: documentId };
