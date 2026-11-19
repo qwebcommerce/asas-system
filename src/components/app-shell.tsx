@@ -40,7 +40,7 @@ export function AppShell({
   const [aiOpen, setAiOpen] = useState(false);
 
   useEffect(() => {
-    if (ready && configured && !user) router.replace("/");
+    if (ready && configured && !user) router.replace("/sign-in");
   }, [configured, ready, router, user]);
 
   if (!ready || (configured && user && !profile)) return null;
@@ -114,7 +114,7 @@ export function AppShell({
               style={{ background: "transparent", border: 0, color: "var(--steel)" }}
               aria-label={t("nav.signOut")}
               onClick={() => {
-                void signOutUser().then(() => router.replace("/"));
+                void signOutUser().then(() => router.replace("/sign-in"));
               }}
             >
               <Icon name="logout" className="icon icon--flip" />

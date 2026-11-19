@@ -24,7 +24,8 @@ export default async function LocaleLayout({
   if (!isLocale(locale)) notFound();
 
   setRequestLocale(locale);
-  const messages = await getMessages();
+  // The public website's text ("site") is rendered on the server only; keep it out of the system's client bundle
+  const messages = Object.fromEntries(Object.entries(await getMessages()).filter(([key]) => key !== "site"));
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>

@@ -177,6 +177,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Website consultation requests: written only by the server (/api/consultations)
+    match /consultations/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /settings/{id} {
       allow read: if (id == "roleMatrix" && activeSignedIn()) || isAdmin();
       allow write: if false;

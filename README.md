@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Public website and private system
+
+The app serves two separate sites, each with its own root layout and stylesheet:
+
+| Area | Routes | Code |
+| --- | --- | --- |
+| Public website (EN / AR) | `/en`, `/en/blogs`, `/en/resources` (and `/ar/...`) | `src/app/(site)`, `src/components/site`, `src/styles/site.css`, text in `messages/*.json` under `site` |
+| Private system | `/en/sign-in`, `/en/overview`, `/en/documents`, … | `src/app/(system)` |
+
+The website's "Request a call" forms post to `/api/consultations`, which saves each request to the
+`consultations` Firestore collection (server-side only; superAdmins can read it). Images live in `public/site`.
