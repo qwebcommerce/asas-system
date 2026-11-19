@@ -7,17 +7,19 @@ export function Modal({
   title,
   children,
   onClose,
+  wide = false,
 }: {
   open: boolean;
   title: string;
   children: React.ReactNode;
   onClose: () => void;
+  wide?: boolean;
 }) {
   const t = useTranslations("common");
   return (
     <>
       <div className={`overlay${open ? " is-open" : ""}`} onClick={onClose} />
-      <div className={`modal${open ? " is-open" : ""}`} role="dialog" aria-modal="true">
+      <div className={`modal${wide ? " modal--wide" : ""}${open ? " is-open" : ""}`} role="dialog" aria-modal="true">
         <div className="between">
           <h2 style={{ fontSize: 20 }}>{title}</h2>
           <button type="button" className="close" onClick={onClose} aria-label={t("close")}>

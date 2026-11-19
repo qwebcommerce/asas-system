@@ -6,11 +6,14 @@ import { mailto, SITE_EMAIL, SITE_PHONE_HREF, otherLocale, sitePath } from "@/co
 import { formText, siteMetadata } from "@/components/site/page-text";
 import { ArrowIcon, DocIcon, LongArrowIcon, PillIcon } from "@/components/site/icons";
 import { Photo, type PhotoName } from "@/components/site/photo";
+import { PostImage } from "@/components/site/post-card";
 import { richTags } from "@/components/site/rich";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteEffects } from "@/components/site/site-effects";
 import { SiteHeader } from "@/components/site/site-header";
 import type { Locale } from "@/i18n/routing";
+import { formatBytes } from "@/lib/website";
+import { siteDocuments, sitePosts } from "@/server/site-content";
 
 type Params = { params: Promise<{ locale: string }> };
 
@@ -22,7 +25,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 const SERVICE_PHOTOS: PhotoName[] = ["svc-plans", "svc-construction", "svc-interior", "svc-finishing", "svc-furniture"];
 const PROJECT_PHOTOS: PhotoName[] = ["project-modern-interior", "project-stone-villa", "project-family-lounge", "project-media-wall"];
 const ABOUT_PHOTOS: PhotoName[] = ["about-dining", "about-villa", "about-construction", "about-lounge"];
-const STORY_PHOTOS: PhotoName[] = ["blog-brief", "blog-details", "blog-team"];
 
 export default async function HomePage({ params }: Params) {
   const { locale: raw } = await params;
@@ -40,8 +42,8 @@ export default async function HomePage({ params }: Params) {
   const aboutAlts = t.raw("about.imgAlts") as string[];
   const reasons = t.raw("why.items") as [string, string][];
   const steps = t.raw("steps.items") as [string, string][];
-  const stories = t.raw("journal.stories") as [string, string, string, string][];
-  const docs = (t.raw("docs.items") as [string, string, string][]).slice(0, 3);
+  const stories = (await sitePosts(locale)).posts.slice(0, 3);
+  const docs = (await siteDocuments(locale)).documents.slice(0, 3);
 
   const project = (i: number) => (
     <article className="project reveal">
@@ -240,12 +242,14 @@ export default async function HomePage({ params }: Params) {
               </Link>
             </div>
             <div className="stories">
-              {stories.map(([label, title, body, alt], i) => (
-                <Link className="story reveal" href={sitePath(locale, "/blogs")} key={title}>
-                  <div className="story__photo"><Photo name={STORY_PHOTOS[i]} alt={alt} sizes="(max-width: 1024px) 100vw, 33vw" /></div>
-                  <p className="label">{label}</p>
-                  <h3>{title}</h3>
-                  <p>{body}</p>
+              {stories.map((post, i) => (
+                <Link className="story reveal" href={sitePath(locale, `/blogs/${post.slug}`)} key={post.slug}>
+                  <div className="story__photo">
+                    <PostImage cover={post.cover} alt={post.coverAlt} sizes="(max-width: 1024px) 100vw, 33vw" />
+                  </div>
+                  <p className="label">0{i + 1} &nbsp;/&nbsp; {t(`blogs.filters.${post.category}`)}</p>
+                  <h3>{post.title}</h3>
+                  <p>{post.excerpt}</p>
                 </Link>
               ))}
             </div>
@@ -265,15 +269,17 @@ export default async function HomePage({ params }: Params) {
               </Link>
             </div>
             <div className="doc-list reveal">
-              {docs.map(([, title]) => (
-                <Link className="doc" href={sitePath(locale, "/resources")} key={title}>
+              {docs.map((doc) => (
+                <a className="doc" href={doc.href ?? sitePath(locale, "/resources")} key={doc.key} {...(doc.href ? { download: doc.fileName } : {})}>
                   <DocIcon />
                   <span>
-                    <span className="doc__title">{title}</span>
-                    <span className="doc__meta" style={{ display: "block" }}>{t("resources.onRequest")}</span>
+                    <span className="doc__title">{doc.title}</span>
+                    <span className="doc__meta" style={{ display: "block" }}>
+                      {doc.href ? t("docs.pdfMeta", { size: formatBytes(doc.size, locale) }) : t("resources.onRequest")}
+                    </span>
                   </span>
                   <LongArrowIcon />
-                </Link>
+                </a>
               ))}
             </div>
           </div>

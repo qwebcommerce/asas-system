@@ -11,17 +11,20 @@ export async function savePrivateFile(folder: string, type: StoredType, bytes: B
   return path;
 }
 
-export async function signedReadUrl(path: string) {
+export async function signedReadUrl(path: string, downloadName?: string) {
   const [url] = await adminBucket().file(path).getSignedUrl({
     version: "v4",
     action: "read",
     expires: Date.now() + 10 * 60 * 1000,
+    ...(downloadName
+      ? { responseDisposition: `attachment; filename="${downloadName.replace(/[^\x20-\x7e]|"/g, "_")}"; filename*=UTF-8''${encodeURIComponent(downloadName)}` }
+      : {}),
   });
   return url;
 }
 
 export async function removePrivateFile(path: string) {
-  if (!path.startsWith("employees/") && !path.startsWith("hr-documents/") && !path.startsWith("project-reports/") && !path.startsWith("library/")) return;
+  if (!path.startsWith("employees/") && !path.startsWith("hr-documents/") && !path.startsWith("project-reports/") && !path.startsWith("library/") && !path.startsWith("website/")) return;
   await adminBucket().file(path).delete({ ignoreNotFound: true });
 }
 

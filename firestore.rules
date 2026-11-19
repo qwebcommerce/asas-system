@@ -177,6 +177,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Website content (blog posts, public documents): managed through server actions only
+    match /blogPosts/{id} {
+      allow read: if readsAll("website");
+      allow write: if false;
+    }
+
+    match /siteDocuments/{id} {
+      allow read: if readsAll("website");
+      allow write: if false;
+    }
+
     // Website consultation requests: written only by the server (/api/consultations)
     match /consultations/{id} {
       allow read: if isAdmin();

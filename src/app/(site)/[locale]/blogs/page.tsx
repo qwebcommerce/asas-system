@@ -5,12 +5,15 @@ import { sitePath } from "@/components/site/content";
 import { FilterButtons } from "@/components/site/filter-buttons";
 import { PillIcon } from "@/components/site/icons";
 import { siteMetadata } from "@/components/site/page-text";
-import { Photo, type PhotoName } from "@/components/site/photo";
+import { Photo } from "@/components/site/photo";
+import { PostCard, PostImage } from "@/components/site/post-card";
 import { richTags } from "@/components/site/rich";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteEffects } from "@/components/site/site-effects";
 import { SiteHeader } from "@/components/site/site-header";
 import type { Locale } from "@/i18n/routing";
+import { blogCategories } from "@/lib/website";
+import { featuredPost, sitePosts } from "@/server/site-content";
 
 type Params = { params: Promise<{ locale: string }> };
 
@@ -19,16 +22,15 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return siteMetadata(locale as Locale, "blogs");
 }
 
-const ARTICLE_PHOTOS: PhotoName[] = ["article-office", "article-bathroom", "article-staircase", "article-villa", "article-dining", "article-wood"];
-const READ_MINUTES = [5, 4, 6, 4, 5, 4];
-const FILTERS = ["all", "planning", "construction", "interiors", "materials"] as const;
-
 export default async function BlogsPage({ params }: Params) {
   const { locale: raw } = await params;
   const locale = raw as Locale;
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "site" });
-  const articles = t.raw("blogs.articles") as [string, string, string][];
+  const { posts } = await sitePosts(locale);
+  const featured = featuredPost(posts);
+  const rest = posts.filter((post) => post !== featured);
+  const categories = blogCategories.filter((cat) => rest.some((post) => post.category === cat));
   const contact = sitePath(locale, "", "contact");
 
   return (
@@ -49,48 +51,53 @@ export default async function BlogsPage({ params }: Params) {
         </section>
 
         {/* Featured story */}
-        <section className="featured">
-          <div className="wrap featured__grid">
-            <div className="featured__photo reveal">
-              <Photo name="journal-featured" alt={t("blogs.featuredAlt")} sizes="(max-width: 1024px) 100vw, 60vw" />
-            </div>
-            <div className="featured__text reveal">
-              <p className="label">{t("blogs.featuredLabel")}</p>
-              <h2 className="display">{t.rich("blogs.featuredTitle", richTags)}</h2>
-              <p className="featured__desc">{t("blogs.featuredDesc")}</p>
-              <p className="featured__meta">{t("blogs.featuredMeta")}</p>
-              <Link className="pill pill--dark" href="#stories">
-                {t("blogs.read")}
-                <PillIcon />
+        {featured ? (
+          <section className="featured">
+            <div className="wrap featured__grid">
+              <Link className="featured__photo reveal" href={sitePath(locale, `/blogs/${featured.slug}`)} tabIndex={-1} aria-hidden="true">
+                <PostImage cover={featured.cover} alt={featured.coverAlt} sizes="(max-width: 1024px) 100vw, 60vw" />
               </Link>
+              <div className="featured__text reveal">
+                <p className="label">{t("blogs.editorsPick")} &nbsp;/&nbsp; {t(`blogs.filters.${featured.category}`)}</p>
+                <h2 className="display">{featured.title}</h2>
+                <p className="featured__desc">{featured.excerpt}</p>
+                <p className="featured__meta">{t("blogs.insights")} &nbsp;·&nbsp; {t("blogs.minRead", { n: featured.readMinutes })}</p>
+                <Link className="pill pill--dark" href={sitePath(locale, `/blogs/${featured.slug}`)}>
+                  {t("blogs.read")}
+                  <PillIcon />
+                </Link>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
 
-        {/* Article collection */}
+        {/* Article collection (hidden while the featured story is the only one) */}
+        {rest.length > 0 ? (
         <section className="collection" id="stories">
           <div className="wrap">
             <h2 className="display reveal">{t("blogs.collection")}</h2>
-            <FilterButtons
-              scope=".articles"
-              buttonClass="filter"
-              label={t("blogs.filterLabel")}
-              options={FILTERS.map((key) => ({ key, label: t(`blogs.filters.${key}`) }))}
-            />
+            {categories.length > 1 ? (
+              <FilterButtons
+                scope=".articles"
+                buttonClass="filter"
+                label={t("blogs.filterLabel")}
+                options={(["all", ...categories] as const).map((key) => ({ key, label: t(`blogs.filters.${key}`) }))}
+              />
+            ) : null}
             <div className="articles">
-              {articles.map(([cat, title, alt], i) => (
-                <div className="article reveal" data-cat={cat} key={title}>
-                  <div className="article__photo">
-                    <Photo name={ARTICLE_PHOTOS[i]} alt={alt} sizes="(max-width: 1024px) 100vw, 33vw" />
-                  </div>
-                  <p className="label">{t(`blogs.filters.${cat}`)}</p>
-                  <h3>{title}</h3>
-                  <p className="article__time">{t("blogs.minRead", { n: READ_MINUTES[i] })}</p>
-                </div>
+              {rest.map((post) => (
+                <PostCard
+                  key={post.slug}
+                  post={post}
+                  locale={locale}
+                  categoryLabel={t(`blogs.filters.${post.category}`)}
+                  minutesLabel={t("blogs.minRead", { n: post.readMinutes })}
+                />
               ))}
             </div>
           </div>
         </section>
+        ) : null}
 
         {/* CTA */}
         <section className="cta-band">

@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import type { Locale } from "@/i18n/routing";
 import { otherLocale, SITE_PHONE_HREF, sitePath } from "./content";
 import { PhoneIcon, PillIcon } from "./icons";
+import { MobileNav } from "./mobile-nav";
 import { Logo } from "./photo";
 
 export type SitePage = "home" | "blogs" | "documents";
@@ -10,10 +11,20 @@ export type SitePage = "home" | "blogs" | "documents";
 /** Path of each page without the locale, used for the language switch. */
 export const PAGE_PATH: Record<SitePage, string> = { home: "", blogs: "/blogs", documents: "/resources" };
 
-export async function SiteHeader({ locale, current }: { locale: Locale; current: SitePage }) {
+export async function SiteHeader({ locale, current, path }: { locale: Locale; current: SitePage; path?: string }) {
   const t = await getTranslations({ locale, namespace: "site" });
   const home = (hash: string) => sitePath(locale, "", hash);
   const other = otherLocale(locale);
+  const otherHref = sitePath(other, path ?? PAGE_PATH[current]);
+  const drawerLinks = [
+    { href: sitePath(locale), label: t("nav.home"), current: current === "home" },
+    { href: home("about"), label: t("nav.about"), current: false },
+    { href: home("services"), label: t("nav.services"), current: false },
+    { href: home("work"), label: t("nav.work"), current: false },
+    { href: sitePath(locale, "/blogs"), label: t("nav.blogs"), current: current === "blogs" },
+    { href: sitePath(locale, "/resources"), label: t("nav.documents"), current: current === "documents" },
+    { href: home("contact"), label: t("nav.contact"), current: false },
+  ];
 
   return (
     <header className="site-header">
@@ -36,7 +47,7 @@ export async function SiteHeader({ locale, current }: { locale: Locale; current:
           <div className="lang">
             <b>{t("lang.current")}</b>
             <i />
-            <a className="alt" href={sitePath(other, PAGE_PATH[current])} lang={other} hrefLang={other} aria-label={t("lang.otherLabel")}>
+            <a className="alt" href={otherHref} lang={other} hrefLang={other} aria-label={t("lang.otherLabel")}>
               {t("lang.other")}
             </a>
           </div>
@@ -48,6 +59,13 @@ export async function SiteHeader({ locale, current }: { locale: Locale; current:
             {t("book")}
             <PillIcon />
           </Link>
+          <MobileNav
+            links={drawerLinks}
+            language={{ current: t("lang.current"), other: t("lang.other"), otherHref, otherLang: other }}
+            phone={{ href: SITE_PHONE_HREF, label: t("phone") }}
+            cta={{ href: home("contact"), label: t("book") }}
+            labels={{ open: t("nav.openMenu"), close: t("nav.closeMenu"), menu: t("nav.menu"), language: t("nav.language") }}
+          />
         </div>
       </div>
     </header>
