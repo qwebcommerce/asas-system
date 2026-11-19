@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
-import { IBM_Plex_Mono, IBM_Plex_Sans_Arabic, Noto_Sans_Arabic, Source_Sans_3 } from "next/font/google";
+import { Carlito, IBM_Plex_Mono, IBM_Plex_Sans_Arabic, Noto_Sans_Arabic, Source_Sans_3 } from "next/font/google";
 import { isLocale } from "@/i18n/routing";
 import "./globals.css";
 
@@ -20,6 +20,14 @@ const notoArabic = Noto_Sans_Arabic({
   subsets: ["arabic"],
   weight: ["300", "400", "600", "700"],
   variable: "--font-noto-arabic",
+});
+
+// Metric-compatible with Calibri, the font of the offer document templates (quotation/contract)
+const carlito = Carlito({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-carlito",
+  preload: false,
 });
 
 const plexMono = IBM_Plex_Mono({
@@ -49,7 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       lang={locale}
       dir={locale === "ar" ? "rtl" : "ltr"}
       data-theme={theme === "dark" ? "dark" : undefined}
-      className={`${sourceSans.variable} ${ibmArabic.variable} ${notoArabic.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${sourceSans.variable} ${ibmArabic.variable} ${notoArabic.variable} ${plexMono.variable} ${carlito.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>

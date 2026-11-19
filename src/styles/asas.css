@@ -723,3 +723,165 @@ img, svg { display: block; max-width: 100%; }
 .web-suffix { display: flex; align-items: center; gap: 0; }
 .web-suffix .input { border-start-end-radius: 0; border-end-end-radius: 0; }
 .web-suffix span { height: 100%; min-height: 42px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--border); border-inline-start: 0; border-start-end-radius: 12px; border-end-end-radius: 12px; background: var(--surface-sunken); color: var(--text-2); font-size: 13px; }
+
+/* =========================================================
+   Architecture offer documents (quotation / contract)
+   Laid out in points to match the reference PDFs (US Letter, 612 x 792 pt).
+   ========================================================= */
+.adoc {
+  --ink: #7f7f7f;
+  --bar: #eaeaea;
+  --strip: #ececed;
+  --col-x: 131.75pt;       /* left edge of rules and bars */
+  --col-r: 21.9pt;         /* page right edge to the end of rules and bars */
+  --rail-x: 27.6pt;        /* page left edge to the logo strip */
+  --head-top: 95.3pt;
+  --en-inset: 9.65pt;      /* English text inside the column */
+  position: relative;
+  width: 612pt;
+  min-height: 792pt;
+  margin: 0 auto;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-carlito), Calibri, Carlito, "Segoe UI", sans-serif;
+  --k: 1;                  /* Arabic runs ~10% wider than the PDF's Arabic; scaled to match */
+  font-size: calc(var(--k) * 12pt);
+  line-height: 1.2;
+  box-shadow: 0 2px 18px rgba(0, 0, 0, .08);
+  overflow: hidden;
+}
+.adoc + .adoc { margin-top: 24px; }
+.adoc--contract { --rail-x: 15.4pt; --col-x: 133.2pt; --col-r: 20.4pt; --head-top: 34.4pt; --en-inset: 3.4pt; }
+.adoc :where([lang="ar"]) { --k: .905; font-size: calc(var(--k) * 12pt); font-family: var(--font-ibm-arabic), "IBM Plex Sans Arabic", "Segoe UI", sans-serif; }
+.adoc :where(p, h2, h3, ul, ol, dl, dd) { margin: 0; padding: 0; }
+.adoc h2, .adoc h3 { font-weight: 400; color: var(--ink); }
+.adoc small { font-size: calc(var(--k) * 10pt); }
+
+/* side strip */
+.adoc-rail { position: absolute; top: 0; bottom: 0; inset-inline-start: var(--rail-x); width: 82.8pt; }
+[dir="rtl"] .adoc-rail { inset-inline-start: auto; left: var(--rail-x); }
+.adoc-rail img { display: block; width: 82.8pt; height: 198.2pt; }
+.adoc-rail i { position: absolute; left: 0; right: 0; top: 210.8pt; bottom: 0; background: var(--strip); }
+.adoc--contract .adoc-rail i { top: 212.6pt; }
+.adoc-rail img, .adoc-rail i, .adoc-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+/* content column (always laid out left-to-right like the paper, whatever the UI language) */
+.adoc-body { direction: ltr; padding: var(--head-top) var(--col-r) 40pt var(--col-x); }
+.adoc-en { text-align: left; }
+.adoc-ar { direction: rtl; text-align: right; }
+
+/* header */
+.adoc-head { display: grid; grid-template-columns: 1fr 1fr; position: relative; }
+.adoc-head .adoc-en { padding-left: var(--en-inset); }
+.adoc-head h2 { font-size: calc(var(--k) * 14pt); line-height: 1.2; }
+.adoc-head .adoc-en h2 { margin-bottom: 12.5pt; }
+.adoc-head .adoc-ar h2 { margin-bottom: 11pt; }
+.adoc-head dl { display: grid; grid-template-columns: max-content 1fr; column-gap: 4pt; line-height: 16pt; }
+.adoc-head dt, .adoc-head dd { margin: 0; }
+.adoc-head .adoc-ar p { line-height: 16pt; }
+.adoc-head--divided::after { content: ""; position: absolute; left: calc(378.3pt - var(--col-x)); top: -2pt; height: 64.5pt; border-left: .5pt solid #000; }
+.adoc-head--divided .adoc-ar { padding-right: 0; }
+.adoc--contract .adoc-head .adoc-en h2 { margin-bottom: 14.6pt; }
+.adoc--contract .adoc-head .adoc-ar h2 { margin-bottom: 15pt; }
+.adoc--contract .adoc-head dl, .adoc--contract .adoc-head .adoc-ar p { line-height: 18.6pt; }
+.adoc--contract .adoc-head .adoc-ar { padding-right: 4pt; }
+
+/* section title + rule */
+.adoc-title { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 0 4pt 1pt; border-bottom: .5pt solid #000; }
+.adoc-title h3 { font-size: calc(var(--k) * 14pt); line-height: 1.2; }
+.adoc--contract .adoc-title { padding-left: 6.6pt; }
+
+/* paired English / Arabic rows with square bullets */
+.adoc-pair { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12pt; }
+.adoc-list { list-style: none; }
+.adoc-bullet { position: relative; }
+.adoc-en.adoc-bullet { padding-left: 29.4pt; }
+.adoc-ar.adoc-bullet { padding-right: 29pt; }
+.adoc-bullet::before { content: ""; position: absolute; top: 5pt; width: 3.4pt; height: 3.4pt; background: #6f6f6f; }
+.adoc-en.adoc-bullet::before { left: 13.6pt; }
+.adoc-ar.adoc-bullet::before { right: 12.4pt; }
+.adoc-bullet:empty::before { display: none; }
+.adoc-sub { font-size: calc(var(--k) * 10pt); line-height: 13pt; }
+
+/* grey bar */
+.adoc-bar { display: flex; justify-content: space-between; align-items: center; height: 17.25pt; background: var(--bar); padding: 0 15pt 0 var(--en-inset); white-space: nowrap; }
+.adoc-bar .adoc-en, .adoc-bar .adoc-ar { flex: 1; }
+
+/* quotation page 1 */
+.adoc-scope { margin-top: 62pt; }
+.adoc-scope .adoc-list { margin-top: 8pt; }
+.adoc-scope .adoc-list li { min-height: 30.7pt; }
+.adoc-bar--area { margin: 29.3pt -6pt 0 -6pt; padding-left: 15.65pt; }
+.adoc-stages { margin-top: 11.3pt; }
+.adoc-stages .adoc-list { margin-top: 8.5pt; }
+.adoc-stages .adoc-list li { min-height: 55pt; }
+
+/* quotation page 2 + contract price */
+.adoc-price { margin-top: 53pt; }
+.adoc-price .adoc-bar--total { margin-top: 32.4pt; }
+.adoc-bar--total .adoc-en { padding-left: 20pt; }
+.adoc-bar--total .adoc-ar { padding-right: 15pt; }
+.adoc-plain { padding: 13pt 0 12pt; }
+.adoc-plain .adoc-en { padding-left: 32.6pt; }
+.adoc-plain .adoc-ar { padding-right: 26pt; }
+.adoc-price .adoc-plain + .adoc-bar--total { margin-top: 0; }
+.adoc-payments { margin-top: 18.3pt; }
+.adoc-pay { margin-top: 11.5pt; }
+.adoc-payments .adoc-title + .adoc-pay { margin-top: 7.7pt; }
+.adoc-pay .adoc-pair { min-height: 34pt; }
+.adoc-pay .adoc-bullet > p:first-child { white-space: nowrap; }
+.adoc-pay .adoc-bar { margin-top: 6.2pt; }
+.adoc-bar--due .adoc-en { padding-left: 21pt; }
+.adoc-bar--due .adoc-ar { padding-right: 30pt; }
+.adoc-close { display: grid; grid-template-columns: 150pt 153pt 1fr; margin-top: 22pt; padding-left: 30pt; font-size: calc(var(--k) * 10pt); }
+.adoc-parties { display: grid; grid-template-columns: 1fr 95pt 142pt; margin-top: 22pt; padding-left: 29.4pt; font-size: calc(var(--k) * 10pt); }
+.adoc-parties dl { display: grid; grid-template-columns: max-content 1fr; column-gap: 8pt; row-gap: 8pt; }
+.adoc-company { line-height: 13pt; }
+.adoc-foot { position: absolute; bottom: 7pt; left: 110pt; right: 22pt; text-align: center; font-size: calc(var(--k) * 10pt); }
+
+/* contract page 1 */
+.adoc-party { margin-top: 97.2pt; }
+.adoc-party--second { margin-top: 34.7pt; }
+.adoc-bar--party { padding-right: 20pt; }
+.adoc-bar--party .adoc-en { display: none; }
+.adoc-row { display: grid; grid-template-columns: 137pt 120pt auto; justify-content: start; padding: 17.7pt 24.4pt 0 10pt; white-space: nowrap; }
+.adoc-row--wide { grid-template-columns: 161pt 121pt auto; }
+.adoc-row--spread { grid-template-columns: 121.6pt 232pt auto; }
+.adoc-row--single { grid-template-columns: auto; }
+.adoc-party .adoc-row + .adoc-row { padding-top: 17.1pt; }
+.adoc-party--second .adoc-row { padding-top: 20.9pt; }
+.adoc-party--second .adoc-row + .adoc-row { padding-top: 10.8pt; }
+.adoc-cscope { margin-top: 79.8pt; }
+.adoc-prose { font-size: calc(var(--k) * 12pt); line-height: 16pt; }
+.adoc-cscope .adoc-prose { padding: 18.3pt 2pt 0 28pt; }
+.adoc-cscope .adoc-prose p + p { margin-top: 22pt; }
+
+/* contract page 2 */
+.adoc-terms { margin-top: 90.3pt; }
+.adoc-terms .adoc-prose { list-style: none; padding: 4pt 4pt 0 6pt; }
+.adoc-terms li + li { margin-top: 16pt; }
+
+/* contract page 3 */
+.adoc-cprice { margin-top: 96.5pt; }
+.adoc-cprice .adoc-bar--total { margin-top: 13.4pt; }
+.adoc-cprice .adoc-bar--total .adoc-en { padding-left: 17.1pt; }
+.adoc--contract .adoc-payments { margin-top: 34.5pt; }
+.adoc--contract .adoc-pay { margin-top: 16.3pt; }
+.adoc--contract .adoc-payments .adoc-title + .adoc-pay { margin-top: 7.7pt; }
+.adoc--contract .adoc-pay .adoc-bar { margin-top: 8.6pt; }
+.adoc-close--ruled { border-top: .5pt solid #000; margin-top: 36pt; padding-top: 11pt; }
+.adoc-signatures { display: grid; grid-template-columns: 1fr 1fr; margin-top: 12pt; padding: 0 0 0 39pt; font-size: calc(var(--k) * 12pt); }
+.adoc-signatures div:last-child { padding-left: 84.9pt; }
+.adoc-signatures i { display: block; margin-top: 4pt; font-style: normal; font-size: 16pt; line-height: 1; letter-spacing: -.5pt; }
+.adoc-signatures i::after { content: "………………."; }
+.adoc-signatures div:first-child i { margin-left: 16pt; }
+
+.adoc-wrap { overflow-x: auto; padding: 8px 0 24px; }
+
+/* US Letter like the reference PDFs; other documents keep the A4 page above */
+@page adoc-letter { size: letter; margin: 0; }
+@media print {
+  .adoc { page: adoc-letter; box-shadow: none; margin: 0; width: 612pt; height: 792pt; min-height: 0; break-after: page; }
+  .adoc + .adoc { margin-top: 0; }
+  .adoc-wrap { overflow: visible; padding: 0; }
+}
