@@ -2,13 +2,24 @@ export const offerStatuses = ["draft", "sent", "accepted", "rejected", "expired"
 export const offerTrades = ["paint", "gyp", "floor", "kitchen"] as const;
 export const offerUnits = ["m2", "lm", "pcs", "set"] as const;
 export const measureShapes = ["walls", "area", "length", "count"] as const;
-export const offerKinds = ["finishing", "architecture"] as const;
+/** Offer types, in the order they are offered when creating an offer. */
+export const offerKinds = ["architecture", "fitout", "interior", "construction"] as const;
 
 export type OfferStatus = (typeof offerStatuses)[number];
 export type OfferTrade = (typeof offerTrades)[number];
 export type OfferUnit = (typeof offerUnits)[number];
 export type MeasureShape = (typeof measureShapes)[number];
 export type OfferKind = (typeof offerKinds)[number];
+
+export function isOfferKind(value: unknown): value is OfferKind {
+  return offerKinds.some((kind) => kind === value);
+}
+
+/** Offers saved before the four types existed used "finishing", which is fit-out work. */
+function storedKind(value: unknown): OfferKind {
+  if (isOfferKind(value)) return value;
+  return "fitout";
+}
 
 export type OfferStage = {
   titleEn: string;
@@ -262,7 +273,7 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
     projectEn: text(data.projectEn),
     projectAr: text(data.projectAr),
     reference: text(data.reference),
-    kind: offerKinds.find((item) => item === data.kind) ?? "finishing",
+    kind: storedKind(data.kind),
     issuedOn: /^\d{4}-\d{2}-\d{2}$/.test(text(data.issuedOn)) ? text(data.issuedOn) : "",
     areaFrom: area(data.areaFrom),
     areaTo: area(data.areaTo),

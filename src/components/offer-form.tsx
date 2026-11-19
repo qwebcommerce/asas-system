@@ -9,7 +9,7 @@ import { useOffers } from "@/components/use-offers";
 import { Toast } from "@/components/ui/overlay";
 import { Link, useRouter } from "@/i18n/navigation";
 import { qatarToday } from "@/lib/hr";
-import { architectureStages, defaultShape, defaultPayments, lineAmount, measureQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, offerTrades, offerUnits, paymentAmounts, priceById, priceList, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit } from "@/lib/offers";
+import { architectureStages, isOfferKind, defaultShape, defaultPayments, lineAmount, measureQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, offerTrades, offerUnits, paymentAmounts, priceById, priceList, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit } from "@/lib/offers";
 import { createOffer, updateOffer } from "@/server/offers";
 
 const savedFlag = "asas-offer-saved";
@@ -28,7 +28,7 @@ type DraftLine = {
   rate: string;
 };
 
-export function OfferForm({ offerId }: { offerId?: string }) {
+export function OfferForm({ offerId, type }: { offerId?: string; type?: string }) {
   const t = useTranslations();
   const { offers, ready, canManage, canView } = useOffers();
   const offer = offerId ? offers.find((item) => item.id === offerId) : undefined;
@@ -56,10 +56,52 @@ export function OfferForm({ offerId }: { offerId?: string }) {
     );
   }
 
-  return <Editor key={offer?.id ?? "new"} initial={offer ?? null} />;
+  if (!offer && !isOfferKind(type)) return <KindPicker />;
+
+  return <Editor key={offer?.id ?? `new-${type}`} initial={offer ?? null} newKind={isOfferKind(type) ? type : "architecture"} />;
 }
 
-function Editor({ initial }: { initial: Offer | null }) {
+const kindIcons: Record<OfferKind, string> = {
+  architecture: "ruler",
+  fitout: "grid",
+  interior: "home",
+  construction: "brief",
+};
+
+/** First step of a new offer: choose its type, then the form opens for that type. */
+function KindPicker() {
+  const t = useTranslations();
+  return (
+    <AppShell title={t("off.title")}>
+      <Link href="/offers" className="back">
+        <Icon name="chevl" className="icon icon--sm icon--flip" />
+        <span>{t("off.back")}</span>
+      </Link>
+      <div className="page-header">
+        <div>
+          <span className="eyebrow">{t("nav.offers")}</span>
+          <h2 className="page-title">{t("off.pickTitle")}</h2>
+          <p className="page-sub">{t("off.pickSub")}</p>
+        </div>
+      </div>
+      <nav className="kind-pick" aria-label={t("off.kind")}>
+        {offerKinds.map((kind, index) => (
+          <Link key={kind} href={`/offers/new?type=${kind}`} className="card kind-pick__item">
+            <span className="tile-icon"><Icon name={kindIcons[kind]} /></span>
+            <span className="kind-pick__text">
+              <b>{t(`off.${kind}`)}</b>
+              <small>{t(`off.pick.${kind}`)}</small>
+            </span>
+            <span className="kind-pick__num num" aria-hidden="true">0{index + 1}</span>
+            <Icon name="chevr" className="icon icon--sm kind-pick__go icon--flip" />
+          </Link>
+        ))}
+      </nav>
+    </AppShell>
+  );
+}
+
+function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKind }) {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
@@ -78,14 +120,15 @@ function Editor({ initial }: { initial: Offer | null }) {
   const [capacityEn, setCapacityEn] = useState(initial?.capacityEn ?? (initial ? "" : "Representative of the land and property"));
   const [capacityAr, setCapacityAr] = useState(initial?.capacityAr ?? (initial ? "" : "بصفته ممثل الارض والعقار"));
   const [reference, setReference] = useState(initial?.reference ?? "");
-  const [kind, setKind] = useState<OfferKind>(initial?.kind ?? "finishing");
+  // The type is chosen before the form opens and is fixed once the offer is saved
+  const kind: OfferKind = initial?.kind ?? newKind;
   const [issuedOn, setIssuedOn] = useState(initial?.issuedOn || qatarToday());
   const [areaFrom, setAreaFrom] = useState(initial?.areaFrom == null ? "" : String(initial.areaFrom));
   const [areaTo, setAreaTo] = useState(initial?.areaTo == null ? "" : String(initial.areaTo));
   const [packageAmount, setPackageAmount] = useState(String(initial?.packageAmount ?? 0));
   const [scopeEn, setScopeEn] = useState(initial?.scopeEn ?? "");
   const [scopeAr, setScopeAr] = useState(initial?.scopeAr ?? "");
-  const [stages, setStages] = useState<StageDraft[]>(() => (initial?.stages ?? []).map(stageDraft));
+  const [stages, setStages] = useState<StageDraft[]>(() => (initial ? initial.stages : newKind === "architecture" ? architectureStages() : []).map(stageDraft));
   const [payments, setPayments] = useState<PayDraft[]>(() => (initial?.payments?.length ? initial.payments : defaultPayments()).map(payDraft));
   const [savedNote, setSavedNote] = useState("");
   const [toast, setToast] = useState(false);
@@ -199,6 +242,10 @@ function Editor({ initial }: { initial: Offer | null }) {
             {initial ? <span className="page-title num" style={{ fontSize: 22 }}> · <bdi>{initial.number}</bdi></span> : null}
           </h2>
           {initial ? <p className="page-sub">{offerTitle(initial, locale)}</p> : null}
+          <p className="kind-chosen">
+            <span className="badge badge--accent">{t(`off.${kind}`)}</span>
+            {!initial ? <Link href="/offers/new" className="link">{t("off.changeType")}</Link> : null}
+          </p>
         </div>
       </div>
       <form
@@ -231,12 +278,6 @@ function Editor({ initial }: { initial: Offer | null }) {
               <Field label={t("off.capacityAr")} value={capacityAr} onChange={setCapacityAr} />
               <Field label={t("off.projectNo")} value={reference} onChange={setReference} />
               <Field label={t("off.issuedOn")} value={issuedOn} onChange={setIssuedOn} type="date" />
-              <div className="field">
-                <label>{t("off.kind")}</label>
-                <select className="select" value={kind} onChange={(event) => setKind(event.target.value as OfferKind)}>
-                  {offerKinds.map((item) => <option key={item} value={item}>{t(`off.${item}`)}</option>)}
-                </select>
-              </div>
               <Field label={t("off.areaFrom")} value={areaFrom} onChange={setAreaFrom} type="number" />
               <Field label={t("off.areaTo")} value={areaTo} onChange={setAreaTo} type="number" />
               <Field label={t("off.packageAmount")} value={packageAmount} onChange={setPackageAmount} type="number" />
@@ -247,7 +288,7 @@ function Editor({ initial }: { initial: Offer | null }) {
           <div className="card stack">
             <div className="between">
               <h3 className="card-title">{t("off.stages")}</h3>
-              <button type="button" className="btn btn--secondary btn--sm" onClick={() => { setKind("architecture"); setStages(architectureStages().map(stageDraft)); }}>{t("off.stageTemplate")}</button>
+              <button type="button" className="btn btn--secondary btn--sm" onClick={() => setStages(architectureStages().map(stageDraft))}>{t("off.stageTemplate")}</button>
             </div>
             {stages.map((stage) => (
               <div className="stack stack--sm" key={stage.key}>

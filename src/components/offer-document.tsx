@@ -8,7 +8,7 @@ import { Icon } from "@/components/icon";
 import { useOffers } from "@/components/use-offers";
 import { Link } from "@/i18n/navigation";
 import { contractTerms } from "@/lib/contract-terms";
-import { letterhead, lineAmount, offerTotals, paymentAmounts, roomTitle, workTitle, type Offer } from "@/lib/offers";
+import { letterhead, lineAmount, offerTotals, paymentAmounts, roomTitle, workTitle, type Offer, type OfferKind } from "@/lib/offers";
 
 export function OfferDocument({ offerId, doc, autoPrint = false }: { offerId: string; doc: "quotation" | "contract"; autoPrint?: boolean }) {
   const t = useTranslations();
@@ -107,8 +107,7 @@ function Foot({ offer }: { offer: Offer }) {
 function QuotationSheets({ offer }: { offer: Offer }) {
   const totals = offerTotals(offer.lines, offer.discountPct, offer.packageAmount);
   const due = paymentAmounts(totals.total, offer.payments);
-  const title = offer.kind === "architecture" ? "Architecture design quotation" : "Quotation";
-  const titleAr = offer.kind === "architecture" ? "عرض سعر تصميم معماري" : "عرض سعر";
+  const { en: title, ar: titleAr } = docTitles[offer.kind].quotation;
   const area = areaLabel(offer.areaFrom, offer.areaTo);
   const scope = linesOf(offer.scopeEn);
   const scopeAr = linesOf(offer.scopeAr);
@@ -168,8 +167,7 @@ function QuotationSheets({ offer }: { offer: Offer }) {
 function ContractSheets({ offer }: { offer: Offer }) {
   const totals = offerTotals(offer.lines, offer.discountPct, offer.packageAmount);
   const due = paymentAmounts(totals.total, offer.payments);
-  const title = offer.kind === "architecture" ? "Architecture contract" : "Contract";
-  const titleAr = offer.kind === "architecture" ? "عقد تصميم معماري" : "عقد";
+  const { en: title, ar: titleAr } = docTitles[offer.kind].contract;
   const area = areaLabel(offer.areaFrom, offer.areaTo);
 
   return (
@@ -247,6 +245,14 @@ function ContractSheets({ offer }: { offer: Offer }) {
     </>
   );
 }
+
+/** Document titles per offer type (architecture uses its own renderer, see architecture-document.tsx). */
+const docTitles: Record<OfferKind, Record<"quotation" | "contract", { en: string; ar: string }>> = {
+  architecture: { quotation: { en: "Architecture design quotation", ar: "عرض سعر تصميم معماري" }, contract: { en: "Architecture contract", ar: "عقد تصميم معماري" } },
+  fitout: { quotation: { en: "Fit-out quotation", ar: "عرض سعر أعمال التجهيز الداخلي" }, contract: { en: "Fit-out contract", ar: "عقد أعمال التجهيز الداخلي" } },
+  interior: { quotation: { en: "Interior design quotation", ar: "عرض سعر تصميم داخلي" }, contract: { en: "Interior design contract", ar: "عقد تصميم داخلي" } },
+  construction: { quotation: { en: "Construction quotation", ar: "عرض سعر أعمال إنشائية" }, contract: { en: "Construction contract", ar: "عقد أعمال إنشائية" } },
+};
 
 function Payments({ offer, due }: { offer: Offer; due: number[] }) {
   return (
