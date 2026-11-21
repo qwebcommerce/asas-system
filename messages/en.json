@@ -273,7 +273,7 @@
     "paidAmount": "Amount paid",
     "party": "Party",
     "partyAr": "Party in Arabic",
-    "chequeNo": "Cheque number",
+    "chequeNo": "Cheque / transfer no.",
     "direction": "Direction",
     "vendor": "Vendor",
     "vendorAr": "Vendor in Arabic",
@@ -334,15 +334,20 @@
     "method": {
       "transfer": "Bank transfer",
       "cheque": "Cheque",
-      "cash": "Cash",
-      "card": "Card"
+      "cash": "Cash"
     },
     "againstInvoice": "Against invoice",
     "noInvoice": "Not against an invoice",
     "noReceipts": "No receipts recorded yet.",
     "receiptsNote": "Money received from clients. Linking an invoice updates its received amount.",
     "needMethod": "Choose how the money was received.",
-    "invoiceHasReceipts": "This invoice has receipts recorded against it. Delete those receipts first."
+    "invoiceHasReceipts": "This invoice has receipts recorded against it. Delete those receipts first.",
+    "needReference": "Enter the cheque or transfer number.",
+    "needPurpose": "Enter what the payment is for, in English and Arabic.",
+    "bank": "Bank",
+    "purpose": "Being for (English)",
+    "purposeAr": "Being for (Arabic)",
+    "internalNote": "Internal note (not printed)"
   },
   "hr": {
     "add": "Add employee",
@@ -842,7 +847,8 @@
     "email": "Email · ASAS System",
     "forgot": "Reset password · ASAS System",
     "website": "Website · ASAS System",
-    "projects": "Projects · ASAS System"
+    "projects": "Projects · ASAS System",
+    "receipt": "Receipt · ASAS System"
   },
   "top": {
     "ai": "Open AI assistant",
@@ -1564,5 +1570,33 @@
     "deleteQ": "Delete this project?",
     "deleteNote": "The project is removed from the system and the website. Projects that still have linked records cannot be deleted.",
     "missingProject": "The selected project no longer exists."
+  },
+  "rcpt": {
+    "open": "Receipt",
+    "back": "Back to accounting",
+    "backProject": "Back to project",
+    "missing": "This receipt could not be found.",
+    "download": "Download PDF",
+    "printHint": "Choose “Save as PDF” in the print window. The voucher prints on one landscape A4 page.",
+    "shareTitle": "Client link",
+    "shareNote": "Anyone with this link can view and download this receipt, without signing in. Send it only to the client.",
+    "copy": "Copy link",
+    "copied": "Link copied",
+    "copyFailed": "Copy failed, select the link and copy it",
+    "whatsapp": "Share on WhatsApp",
+    "email": "Send by email",
+    "emailSubject": "Receipt {number} – ASAS Executive Contracting",
+    "shareText": "Dear client, please find your payment receipt {number} from ASAS Executive Contracting: {link}",
+    "makeLink": "Create client link",
+    "noLink": "No client link yet. An accounting manager can create one.",
+    "linkReady": "Client link ready",
+    "linkRenewed": "New link created, the old link no longer works",
+    "renew": "Reset link",
+    "renewTitle": "Reset the client link?",
+    "renewBody": "A new link will be created and the current link will stop working. Use this if the link was sent to the wrong person.",
+    "publicTitle": "Receipt {number}",
+    "publicNote": "ASAS Executive Contracting W.L.L. · Payment receipt",
+    "publicMissingTitle": "Receipt not available",
+    "publicMissing": "This link is not valid or has been replaced. Please ask ASAS for a new link."
   }
 }

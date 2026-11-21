@@ -10,6 +10,7 @@ import { useAccounting } from "@/components/use-accounting";
 import { Kpi } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/data";
 import { Modal, Toast } from "@/components/ui/overlay";
+import { Link, useRouter } from "@/i18n/navigation";
 import { billCategories, billProblem, billState, invoiceMath, invoiceProblem, invoiceState, ledger, monthProfit, owed, partyName, payable, receiptMethods, receiptProblem, type Bill, type BillCategory, type BillInput, type Expense, type ExpenseInput, type Invoice, type InvoiceInput, type Receipt, type ReceiptInput, type ReceiptMethod } from "@/lib/accounting";
 import { currentMonthKey, qatarToday } from "@/lib/hr";
 import { createBill, createInvoice, createReceipt, deleteAccountingRecord, updateBill, updateExpense, updateInvoice, updateReceipt } from "@/server/accounting";
@@ -205,6 +206,7 @@ export function AccountingScreen() {
                     amount: formatQar(receipt.amount, locale),
                   }))}
                   onEdit={(id) => setEditor({ book: "receipts", id })}
+                  openHref={(id) => `/accounting/receipts/${id}`}
                   onDelete={(id) => {
                     const receipt = receipts.find((item) => item.id === id);
                     if (receipt) void remove("receipts", id, receipt.number);
@@ -272,7 +274,8 @@ export function AccountingScreen() {
   );
 }
 
-function BookTable({ rows, empty, onEdit, onDelete, showCategory = false, manage = false }: { rows: { id: string; title: string; meta: string; category?: string; status: string; tone: string; amount: string }[]; empty: string; onEdit: (id: string) => void; onDelete: (id: string) => void; showCategory?: boolean; manage?: boolean }) {
+function BookTable({ rows, empty, onEdit, onDelete, showCategory = false, manage = false, openHref }: { rows: { id: string; title: string; meta: string; category?: string; status: string; tone: string; amount: string }[]; empty: string; onEdit: (id: string) => void; onDelete: (id: string) => void; showCategory?: boolean; manage?: boolean; openHref?: (id: string) => string }) {
+  const actions = manage || Boolean(openHref);
   const t = useTranslations();
   return (
     <div className="card card--flush table-wrap">
@@ -283,22 +286,23 @@ function BookTable({ rows, empty, onEdit, onDelete, showCategory = false, manage
             {showCategory ? <th>{t("fin.category")}</th> : null}
             <th>{t("col.status")}</th>
             <th className="end">{t("col.net")}</th>
-            {manage ? <th /> : null}
+            {actions ? <th /> : null}
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 ? <tr><td colSpan={(showCategory ? 4 : 3) + (manage ? 1 : 0)}>{empty}</td></tr> : null}
+          {rows.length === 0 ? <tr><td colSpan={(showCategory ? 4 : 3) + (actions ? 1 : 0)}>{empty}</td></tr> : null}
           {rows.map((row) => (
             <tr key={row.id}>
               <td data-label={t("col.name")}><b>{row.title}</b><small className="muted" style={{ display: "block" }}><bdi>{row.meta}</bdi></small></td>
               {showCategory ? <td data-label={t("fin.category")}>{row.category}</td> : null}
               <td data-label={t("col.status")}><span className={`badge badge--${row.tone}`}>{row.status}</span></td>
               <td data-label={t("col.net")} className="num end"><bdi>{row.amount}</bdi></td>
-              {manage ? (
+              {actions ? (
                 <td className="end" data-label="">
                   <div className="hstack">
-                    <button type="button" className="btn btn--secondary btn--sm" onClick={() => onEdit(row.id)}>{t("us.edit")}</button>
-                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => onDelete(row.id)}>{t("us.delete")}</button>
+                    {openHref ? <Link className="btn btn--secondary btn--sm" href={openHref(row.id)}>{t("rcpt.open")}</Link> : null}
+                    {manage ? <button type="button" className="btn btn--secondary btn--sm" onClick={() => onEdit(row.id)}>{t("us.edit")}</button> : null}
+                    {manage ? <button type="button" className="btn btn--ghost btn--sm" onClick={() => onDelete(row.id)}>{t("us.delete")}</button> : null}
                   </div>
                 </td>
               ) : null}
@@ -426,21 +430,47 @@ function BillForm({ source, record, preset, getToken, onClose, onSaved }: FormPr
 }
 
 function blankReceipt(): ReceiptInput {
-  return { projectId: "", projectEn: "", projectAr: "", payerEn: "", payerAr: "", amount: 0, receivedOn: qatarToday(), method: "transfer", reference: "", invoiceId: "", note: "" };
+  return { projectId: "", projectEn: "", projectAr: "", payerEn: "", payerAr: "", amount: 0, receivedOn: qatarToday(), method: "transfer", reference: "", bank: "", purposeEn: "", purposeAr: "", invoiceId: "", note: "" };
+}
+
+/** Suggested "Being for" wording from the linked invoice or project; kept only while the user hasn't typed their own. */
+function suggestedPurpose(project: { en: string; ar: string }, invoiceNumber: string) {
+  if (invoiceNumber) {
+    return {
+      purposeEn: `Payment against invoice ${invoiceNumber}${project.en ? ` – ${project.en}` : ""}`,
+      purposeAr: `دفعة مقابل الفاتورة ${invoiceNumber}${project.ar ? ` – ${project.ar}` : ""}`,
+    };
+  }
+  if (project.en || project.ar) return { purposeEn: `Payment for ${project.en || project.ar}`, purposeAr: `دفعة لمشروع ${project.ar || project.en}` };
+  return { purposeEn: "", purposeAr: "" };
 }
 
 /** Money received from a client; linking an invoice keeps that invoice's "received" amount in step. */
 function ReceiptForm({ record, preset, invoices, getToken, onClose, onSaved }: FormProps<Receipt> & { invoices: Invoice[] }) {
   const t = useTranslations();
   const locale = useLocale();
+  const router = useRouter();
   const [form, setForm] = useState<ReceiptInput>(() => {
-    if (!record) return { ...blankReceipt(), ...linkOf(preset), payerEn: preset?.clientEn ?? "", payerAr: preset?.clientAr ?? "" };
+    if (!record) {
+      const project = { en: preset?.projectEn ?? "", ar: preset?.projectAr ?? "" };
+      return { ...blankReceipt(), ...linkOf(preset), payerEn: preset?.clientEn ?? "", payerAr: preset?.clientAr ?? "", ...suggestedPurpose(project, "") };
+    }
     const input = blankReceipt();
     for (const key of Object.keys(input) as (keyof ReceiptInput)[]) (input as Record<string, unknown>)[key] = record[key];
     return input;
   });
   const [error, setError] = useState("");
   const choices = invoices.filter((invoice) => invoice.issued && (!form.projectId || invoice.projectId === form.projectId || invoice.id === form.invoiceId));
+  const invoiceNumber = (id: string) => invoices.find((item) => item.id === id)?.number ?? "";
+
+  /** Re-suggests "Being for" after the project or invoice changes, unless the user wrote their own. */
+  function withPurpose(next: ReceiptInput): ReceiptInput {
+    const before = suggestedPurpose({ en: form.projectEn, ar: form.projectAr }, invoiceNumber(form.invoiceId));
+    const untouched = (!form.purposeEn || form.purposeEn === before.purposeEn) && (!form.purposeAr || form.purposeAr === before.purposeAr);
+    return untouched ? { ...next, ...suggestedPurpose({ en: next.projectEn, ar: next.projectAr }, invoiceNumber(next.invoiceId)) } : next;
+  }
+
+  const cash = form.method === "cash";
   return (
     <form className="stack" onSubmit={(event) => {
       event.preventDefault();
@@ -449,14 +479,22 @@ function ReceiptForm({ record, preset, invoices, getToken, onClose, onSaved }: F
         setError(t(problem));
         return;
       }
-      void saveForm(record ? (token) => updateReceipt(token, record.id, form) : (token) => createReceipt(token, form), getToken, record?.number || form.payerEn, onSaved, setError, t);
+      if (record) {
+        void saveForm((token) => updateReceipt(token, record.id, form), getToken, record.number, onSaved, setError, t);
+        return;
+      }
+      // A new receipt opens its voucher, ready to download or share with the client
+      void saveForm((token) => createReceipt(token, form), getToken, form.payerEn, (detail, id) => {
+        onSaved(detail);
+        if (id) router.push(`/accounting/receipts/${id}`);
+      }, setError, t);
     }}>
       <div className="form-grid form-grid--2">
-        <ProjectSelect id="receipt-project" value={form.projectId} onChange={(projectId, project) => setForm({ ...form, projectId, projectEn: project?.nameEn ?? "", projectAr: project?.nameAr ?? "", invoiceId: "", payerEn: form.payerEn || project?.clientEn || "", payerAr: form.payerAr || project?.clientAr || "" })} />
+        <ProjectSelect id="receipt-project" value={form.projectId} onChange={(projectId, project) => setForm(withPurpose({ ...form, projectId, projectEn: project?.nameEn ?? "", projectAr: project?.nameAr ?? "", invoiceId: "", payerEn: form.payerEn || project?.clientEn || "", payerAr: form.payerAr || project?.clientAr || "" }))} />
         <Field label={t("fin.againstInvoice")}>
           <select className="select" value={form.invoiceId} onChange={(event) => {
             const invoice = invoices.find((item) => item.id === event.target.value);
-            setForm({ ...form, invoiceId: event.target.value, payerEn: form.payerEn || invoice?.clientEn || "", payerAr: form.payerAr || invoice?.clientAr || "" });
+            setForm(withPurpose({ ...form, invoiceId: event.target.value, payerEn: form.payerEn || invoice?.clientEn || "", payerAr: form.payerAr || invoice?.clientAr || "" }));
           }}>
             <option value="">{t("fin.noInvoice")}</option>
             {choices.map((invoice) => (
@@ -473,9 +511,13 @@ function ReceiptForm({ record, preset, invoices, getToken, onClose, onSaved }: F
             {receiptMethods.map((method) => <option key={method} value={method}>{t(`fin.method.${method}`)}</option>)}
           </select>
         </Field>
-        <Text label={t("fin.reference")} value={form.reference} onChange={(reference) => setForm({ ...form, reference })} />
+        {cash ? <div /> : <Text label={t("fin.chequeNo")} value={form.reference} onChange={(reference) => setForm({ ...form, reference })} />}
+        {cash ? null : <Text label={t("fin.bank")} value={form.bank} onChange={(bank) => setForm({ ...form, bank })} />}
+        {cash ? null : <div />}
+        <Text label={t("fin.purpose")} value={form.purposeEn} onChange={(purposeEn) => setForm({ ...form, purposeEn })} />
+        <Field label={t("fin.purposeAr")}><input className="input" dir="rtl" lang="ar" value={form.purposeAr} onChange={(event) => setForm({ ...form, purposeAr: event.target.value })} /></Field>
       </div>
-      <Field label={t("fin.note")}><textarea className="textarea" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
+      <Field label={t("fin.internalNote")}><textarea className="textarea" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
       <FormError message={error} />
       <FormActions onClose={onClose} />
     </form>
@@ -529,11 +571,11 @@ type FormProps<T> = {
   onSaved: (detail: string) => void;
 };
 
-async function saveForm(action: (token: string) => Promise<{ ok: true; id?: string } | { ok: false; error: string }>, getToken: () => Promise<string>, detail: string, onSaved: (detail: string) => void, setError: (message: string) => void, t: (key: string) => string) {
+async function saveForm(action: (token: string) => Promise<{ ok: true; id?: string } | { ok: false; error: string }>, getToken: () => Promise<string>, detail: string, onSaved: (detail: string, id?: string) => void, setError: (message: string) => void, t: (key: string) => string) {
   setError("");
   const result = await action(await getToken());
   if (!result.ok) setError(t(result.error));
-  else onSaved(detail);
+  else onSaved(detail, result.id);
 }
 
 function blankInvoice(): InvoiceInput {

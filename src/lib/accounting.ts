@@ -92,7 +92,8 @@ export type Expense = {
 
 export type ExpenseInput = Omit<Expense, "id">;
 
-export const receiptMethods = ["transfer", "cheque", "cash", "card"] as const;
+/** As on the printed voucher: cash, cheque or bank transfer. */
+export const receiptMethods = ["cash", "cheque", "transfer"] as const;
 export type ReceiptMethod = (typeof receiptMethods)[number];
 
 /** Money received from a client, optionally against an invoice. */
@@ -107,18 +108,28 @@ export type Receipt = {
   amount: number;
   receivedOn: string;
   method: ReceiptMethod;
+  /** Cheque or transfer number. */
   reference: string;
+  bank: string;
+  /** "Being for" line on the voucher. */
+  purposeEn: string;
+  purposeAr: string;
   invoiceId: string;
+  /** Internal note, not printed. */
   note: string;
+  /** Secret for the client's link to the voucher (set by the server). */
+  shareToken: string;
 };
 
-export type ReceiptInput = Omit<Receipt, "id" | "number">;
+export type ReceiptInput = Omit<Receipt, "id" | "number" | "shareToken">;
 
 export function receiptProblem(input: ReceiptInput) {
   if (!named(input.payerEn, input.payerAr)) return "fin.needNames";
   if (!dated(input.receivedOn)) return "fin.needDates";
   if (!whole(input.amount) || input.amount < 1) return "fin.needAmount";
   if (!receiptMethods.includes(input.method)) return "fin.needMethod";
+  if (input.method !== "cash" && !input.reference.trim()) return "fin.needReference";
+  if (!named(input.purposeEn, input.purposeAr)) return "fin.needPurpose";
   return null;
 }
 
@@ -402,7 +413,11 @@ export function mapReceipt(id: string, data: Record<string, unknown>): Receipt |
     receivedOn,
     method,
     reference: text(data.reference),
+    bank: text(data.bank),
+    purposeEn: text(data.purposeEn),
+    purposeAr: text(data.purposeAr),
     invoiceId: text(data.invoiceId),
     note: text(data.note),
+    shareToken: text(data.shareToken),
   };
 }
