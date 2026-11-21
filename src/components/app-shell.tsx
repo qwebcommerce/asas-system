@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAuth } from "@/components/auth-provider";
-import { AsasLogo } from "@/components/asas-logo";
+import Image from "next/image";
 import { Icon } from "@/components/icon";
 import { LanguageSwitch } from "@/components/language-switch";
 import { ThemeToggle } from "@/components/theme";
@@ -61,7 +61,10 @@ export function AppShell({
       <div className="app">
         <aside className={`sidebar${menuOpen ? " is-open" : ""}`} id="sidebar" aria-label="Main">
           <div className="brand">
-            <AsasLogo className="brand-logo" title="ASAS EXECUTION" />
+            {/* Official silver logo (transparent PNG made from the brand artwork) */}
+            <Link href="/overview" className="brand-link" onClick={() => setMenuOpen(false)}>
+              <Image className="brand-logo" src="/asas-logo-silver.png" alt="ASAS EXECUTION" width={247} height={409} priority unoptimized />
+            </Link>
           </div>
           <div className="nav-label">{t("nav.workspace")}</div>
           <nav>

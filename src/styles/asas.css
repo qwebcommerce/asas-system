@@ -159,7 +159,9 @@ img, svg { display: block; max-width: 100%; }
 .brand svg { width: 28px; height: 40px; fill: var(--mist); }
 /* Letterhead logo (same artwork as the contract / quotation PDFs) */
 .brand { padding-block: 4px 22px; }
-.brand .brand-logo { width: 46px; height: auto; aspect-ratio: 82.85 / 198.2; fill: none; color: #B8BDC7; }
+.brand .brand-link { display: block; border-radius: 6px; }
+.brand .brand-link:focus-visible { outline: 2px solid var(--champagne); outline-offset: 4px; }
+.brand .brand-logo { display: block; width: 72px; height: auto; }
 .brand b { display: block; color: #F2F2F2; font-size: 15px; letter-spacing: 3px; font-weight: 600; }
 .brand small { display: block; font-size: 9.5px; letter-spacing: 3px; color: var(--steel); }
 .nav-label { padding: 16px 14px 6px; font-size: 10.5px; letter-spacing: 2px; font-weight: 600; color: #5E6064; text-transform: uppercase; }
