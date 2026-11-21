@@ -7,7 +7,7 @@ import type { ActionResult } from "@/lib/directory";
 import { adminDb } from "@/lib/firebase-admin";
 import { qatarToday } from "@/lib/hr";
 import { isOfferKind } from "@/lib/offers";
-import { PROJECT_LIMITS, projectProblems, projectStatuses, type ProjectInput } from "@/lib/projects";
+import { isProjectImageSlot, PROJECT_LIMITS, projectImageSlots, projectProblems, projectStatuses, type ProjectImageSlot, type ProjectInput } from "@/lib/projects";
 import { slugify } from "@/lib/website";
 import { removePrivateFile, signedReadUrl } from "@/server/blobs";
 import { projectInUse } from "@/server/project-link";
@@ -93,6 +93,10 @@ export async function createProject(idToken: string, input: ProjectInput): Promi
       slug: await uniqueSlug(project.nameEn),
       coverPath: "",
       coverType: "",
+      photo1Path: "",
+      photo1Type: "",
+      photo2Path: "",
+      photo2Type: "",
       createdBy: who.uid,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -139,8 +143,10 @@ export async function deleteProject(idToken: string, projectId: string): Promise
     const snap = await ref.get();
     if (!snap.exists) return fail("us.invalid");
     if (await projectInUse(projectId)) return fail("prj.inUse");
-    const cover = snap.data()?.coverPath;
-    if (typeof cover === "string" && cover) await removePrivateFile(cover);
+    for (const slot of projectImageSlots) {
+      const path = snap.data()?.[`${slot}Path`];
+      if (typeof path === "string" && path) await removePrivateFile(path);
+    }
     await ref.delete();
     await audit("projects.delete", who.uid, projectId, String(snap.data()?.nameEn ?? ""));
     updateTag(SITE_TAG);
@@ -150,16 +156,18 @@ export async function deleteProject(idToken: string, projectId: string): Promise
   }
 }
 
-export async function clearProjectCover(idToken: string, projectId: string): Promise<ActionResult> {
+/** Removes one of the project's website images (the cover or a gallery photo). */
+export async function clearProjectImage(idToken: string, projectId: string, slot: ProjectImageSlot): Promise<ActionResult> {
   try {
     const who = await gate(idToken, true);
     if ("error" in who) return fail(who.error);
+    if (!isProjectImageSlot(slot)) return fail("us.invalid");
     const ref = adminDb().collection("projects").doc(projectId);
     const snap = await ref.get();
     if (!snap.exists) return fail("us.invalid");
-    const cover = snap.data()?.coverPath;
-    if (typeof cover === "string" && cover) await removePrivateFile(cover);
-    await ref.update({ coverPath: "", coverType: "" });
+    const path = snap.data()?.[`${slot}Path`];
+    if (typeof path === "string" && path) await removePrivateFile(path);
+    await ref.update({ [`${slot}Path`]: "", [`${slot}Type`]: "" });
     updateTag(SITE_TAG);
     return { ok: true };
   } catch {
@@ -167,12 +175,14 @@ export async function clearProjectCover(idToken: string, projectId: string): Pro
   }
 }
 
-export async function openProjectCover(idToken: string, projectId: string): Promise<{ ok: true; url: string } | Fail> {
+/** Short-lived link to preview one of the project's website images in the form. */
+export async function openProjectImage(idToken: string, projectId: string, slot: ProjectImageSlot): Promise<{ ok: true; url: string } | Fail> {
   try {
     const who = await gate(idToken, false);
     if ("error" in who) return fail(who.error);
+    if (!isProjectImageSlot(slot)) return fail("us.invalid");
     const snap = await adminDb().collection("projects").doc(projectId).get();
-    const path = snap.data()?.coverPath;
+    const path = snap.data()?.[`${slot}Path`];
     if (!snap.exists || typeof path !== "string" || !path.startsWith("website/")) return fail("us.invalid");
     return { ok: true, url: await signedReadUrl(path) };
   } catch {

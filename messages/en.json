@@ -1769,7 +1769,7 @@
     "address": "Client address",
     "notes": "Notes",
     "publish": "Show this project on the website",
-    "publishHint": "Only the project name, type, location, summary and cover image are shown publicly. Client details, budget and notes stay private.",
+    "publishHint": "Only the project name, type, location, summary, cover image and gallery photos are shown publicly. Client details, budget and notes stay private.",
     "summary": "Public summary",
     "cover": "Cover image",
     "required": "Required.",
@@ -1817,7 +1817,10 @@
     "noModuleAccess": "You do not have access to this section.",
     "deleteQ": "Delete this project?",
     "deleteNote": "The project is removed from the system and the website. Projects that still have linked records cannot be deleted.",
-    "missingProject": "The selected project no longer exists."
+    "missingProject": "The selected project no longer exists.",
+    "photo": "Gallery photo {n}",
+    "galleryHint": "Optional. Shown under the cover on the website. JPG, PNG or WebP, up to 2 MB.",
+    "currentImage": "Current image"
   },
   "rcpt": {
     "open": "Receipt",

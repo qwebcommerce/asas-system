@@ -2,11 +2,14 @@ import { revalidateTag } from "next/cache";
 import { canWriteModule } from "@/lib/access";
 import { fileProblem, resolveStoredType } from "@/lib/files";
 import { adminDb } from "@/lib/firebase-admin";
+import { isProjectImageSlot } from "@/lib/projects";
 import { removePrivateFile, savePrivateFile } from "@/server/blobs";
 import { actor, audit } from "@/server/session";
 
 /*
- * Cover image upload for a blog post (Website module). Form fields: token, purpose ("cover"), id, file.
+ * Image upload for a blog post cover (Website module) or a project's website images (Projects module).
+ * Form fields: token, purpose ("cover" | "project"), id, file, and for projects `slot`
+ * ("cover", "photo1" or "photo2"; defaults to the cover).
  * Document PDFs (up to 10 MB) do not come through here: the browser uploads them straight to
  * Storage and the document server actions attach them (see attachStagedPdf in src/server/website.ts).
  */
@@ -50,11 +53,13 @@ export async function POST(request: Request) {
     const snap = await ref.get();
     if (!snap.exists) return Response.json({ ok: false, error: "us.invalid" });
 
-    const previous = typeof snap.data()?.coverPath === "string" ? (snap.data()?.coverPath as string) : "";
+    const slot = purpose === "project" ? text(form.get("slot")) || "cover" : "cover";
+    if (!isProjectImageSlot(slot)) return Response.json({ ok: false, error: "us.invalid" });
+    const previous = typeof snap.data()?.[`${slot}Path`] === "string" ? (snap.data()?.[`${slot}Path`] as string) : "";
     const path = await savePrivateFile(`website/${purpose === "project" ? "projects" : "covers"}/${id}`, type, bytes);
-    await ref.update({ coverPath: path, coverType: type });
+    await ref.update({ [`${slot}Path`]: path, [`${slot}Type`]: type });
     if (previous) await removePrivateFile(previous);
-    await audit(`website.${purpose}.upload`, who.uid, id, type);
+    await audit(`website.${purpose}.upload`, who.uid, id, slot === "cover" ? type : `${slot} ${type}`);
     // Expire immediately so the next visit shows the new cover (and a project published with it)
     revalidateTag("website", { expire: 0 });
     return Response.json({ ok: true, id });
