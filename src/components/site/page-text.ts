@@ -7,6 +7,7 @@ import { PAGE_PATH, type SitePage } from "./site-header";
 
 const META_KEYS: Record<SitePage, [string, string]> = {
   home: ["homeTitle", "homeDesc"],
+  work: ["workTitle", "workDesc"],
   blogs: ["blogsTitle", "blogsDesc"],
   documents: ["docsTitle", "docsDesc"],
 };

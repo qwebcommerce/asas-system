@@ -1,3 +1,4 @@
+import type { OfferKind } from "@/lib/offers";
 import type { BlogCategory, SiteDocCategory } from "@/lib/website";
 
 /*
@@ -311,5 +312,92 @@ export const sampleDocuments: SampleDocument[] = [
     descEn: "What to prepare before meeting the ASAS team.",
     descAr: "ما يجب تحضيره قبل لقاء فريق أساس.",
     category: "planning",
+  },
+];
+
+export type SampleProjectPhoto = "project-modern-interior" | "project-stone-villa" | "project-family-lounge" | "project-media-wall";
+
+/** Sample projects (concept imagery), shown until the first project is published from the system. */
+export type SampleProject = {
+  slug: string;
+  nameEn: string;
+  nameAr: string;
+  kind: OfferKind;
+  scopeEn: string;
+  scopeAr: string;
+  locationEn: string;
+  locationAr: string;
+  summaryEn: string;
+  summaryAr: string;
+  year: string;
+  photo: SampleProjectPhoto;
+  altEn: string;
+  altAr: string;
+};
+
+export const sampleProjects: SampleProject[] = [
+  {
+    slug: "modern-interior-luxury-and-comfort",
+    nameEn: "Modern interior that reflects luxury and comfort",
+    nameAr: "تصميم داخلي عصري يعكس الفخامة والراحة",
+    kind: "interior",
+    scopeEn: "Residential · Full interior renovation",
+    scopeAr: "سكني · تجديد داخلي كامل",
+    locationEn: "Qatar",
+    locationAr: "قطر",
+    summaryEn: "A family majlis reworked from the ceiling down: layered lighting, a statement chandelier, wall panelling and furniture made to measure.",
+    summaryAr: "مجلس عائلي أُعيد تصميمه من السقف حتى الأرض: إضاءة متدرجة، وثريا لافتة، وتكسيات جدارية، وأثاث مصمم حسب المقاس.",
+    year: "2026",
+    photo: "project-modern-interior",
+    altEn: "Modern majlis interior with chandelier",
+    altAr: "مجلس عصري بثريا",
+  },
+  {
+    slug: "stone-villa",
+    nameEn: "Stone villa",
+    nameAr: "فيلا حجرية",
+    kind: "architecture",
+    scopeEn: "Plans · Construction",
+    scopeAr: "مخططات · إنشاءات",
+    locationEn: "Qatar",
+    locationAr: "قطر",
+    summaryEn: "A two-storey family villa with a natural stone facade, deep shaded balconies and a plan arranged around a cool central hall.",
+    summaryAr: "فيلا عائلية من طابقين بواجهة من الحجر الطبيعي وشرفات مظللة عميقة، ومخطط ينتظم حول صالة مركزية باردة.",
+    year: "2025",
+    photo: "project-stone-villa",
+    altEn: "Stone villa facade with balcony",
+    altAr: "واجهة فيلا حجرية بشرفة",
+  },
+  {
+    slug: "family-lounge",
+    nameEn: "Family lounge",
+    nameAr: "صالة عائلية",
+    kind: "interior",
+    scopeEn: "Interior · Furniture",
+    scopeAr: "تصميم داخلي · أثاث",
+    locationEn: "Qatar",
+    locationAr: "قطر",
+    summaryEn: "Long, low seating and warm materials turn a large living room into a comfortable space for everyday family life and guests.",
+    summaryAr: "جلسات طويلة منخفضة ومواد دافئة تحوّل صالة المعيشة الكبيرة إلى مساحة مريحة للحياة العائلية اليومية والضيوف.",
+    year: "2025",
+    photo: "project-family-lounge",
+    altEn: "Family lounge with long seating",
+    altAr: "صالة عائلية بجلسة ممتدة",
+  },
+  {
+    slug: "media-wall",
+    nameEn: "Media wall",
+    nameAr: "جدار تلفاز",
+    kind: "fitout",
+    scopeEn: "Finishing",
+    scopeAr: "تشطيبات",
+    locationEn: "Qatar",
+    locationAr: "قطر",
+    summaryEn: "A timber media wall with concealed storage and lighting, detailed to line up with the majlis ceiling and joinery.",
+    summaryAr: "جدار تلفاز خشبي بتخزين وإضاءة مخفيين، مُفصّل ليتطابق مع سقف المجلس وأعمال النجارة.",
+    year: "2024",
+    photo: "project-media-wall",
+    altEn: "Majlis with wooden media wall",
+    altAr: "مجلس بجدار تلفاز خشبي",
   },
 ];

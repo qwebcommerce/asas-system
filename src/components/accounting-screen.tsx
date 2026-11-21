@@ -5,21 +5,24 @@ import { useLocale, useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
+import { ProjectSelect } from "@/components/project-select";
 import { useAccounting } from "@/components/use-accounting";
 import { Kpi } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/data";
 import { Modal, Toast } from "@/components/ui/overlay";
-import { billCategories, billProblem, billState, invoiceMath, invoiceProblem, invoiceState, ledger, monthProfit, owed, partyName, payable, type Bill, type BillCategory, type BillInput, type Expense, type ExpenseInput, type Invoice, type InvoiceInput } from "@/lib/accounting";
+import { billCategories, billProblem, billState, invoiceMath, invoiceProblem, invoiceState, ledger, monthProfit, owed, partyName, payable, receiptMethods, receiptProblem, type Bill, type BillCategory, type BillInput, type Expense, type ExpenseInput, type Invoice, type InvoiceInput, type Receipt, type ReceiptInput, type ReceiptMethod } from "@/lib/accounting";
 import { currentMonthKey, qatarToday } from "@/lib/hr";
-import { createBill, createInvoice, deleteAccountingRecord, updateBill, updateExpense, updateInvoice } from "@/server/accounting";
+import { createBill, createInvoice, createReceipt, deleteAccountingRecord, updateBill, updateExpense, updateInvoice, updateReceipt } from "@/server/accounting";
 
-type Book = "invoices" | "bills" | "expenses";
+type Book = "invoices" | "bills" | "expenses" | "receipts";
+
+export type { Book };
 
 export function AccountingScreen() {
   const t = useTranslations();
   const locale = useLocale();
   const { getToken } = useAuth();
-  const { invoices, bills, expenses, ready, canView, canManage } = useAccounting();
+  const { invoices, bills, expenses, receipts, ready, canView, canManage } = useAccounting();
   const [tab, setTab] = useState("dash");
   const [editor, setEditor] = useState<{ book: Book; id: string | null } | null>(null);
   const [costCategory, setCostCategory] = useState<BillCategory | "all">("all");
@@ -80,6 +83,7 @@ export function AccountingScreen() {
                 { id: "dash", label: t("at.dash") },
                 { id: "inv", label: t("at.inv") },
                 { id: "bills", label: t("at.bills") },
+                { id: "receipts", label: t("at.receipts") },
                 { id: "journal", label: t("at.journal") },
                 { id: "reports", label: t("at.reports") },
               ]}
@@ -183,6 +187,31 @@ export function AccountingScreen() {
                 />
               </>
             ) : null}
+            {tab === "receipts" ? (
+              <>
+                <div className="between">
+                  <p className="muted">{t("fin.receiptsNote")}</p>
+                  {canManage ? <button type="button" className="btn btn--primary" onClick={() => setEditor({ book: "receipts", id: null })}><Icon name="plus" />{t("fin.add.receipts")}</button> : null}
+                </div>
+                <BookTable
+                  manage={canManage}
+                  empty={ready ? t("fin.noReceipts") : t("common.loading")}
+                  rows={receipts.slice().sort((a, b) => b.receivedOn.localeCompare(a.receivedOn) || b.number.localeCompare(a.number)).map((receipt) => ({
+                    id: receipt.id,
+                    title: locale === "ar" ? receipt.payerAr || receipt.payerEn : receipt.payerEn || receipt.payerAr,
+                    meta: [receipt.number, formatDay(receipt.receivedOn, locale), partyName({ projectEn: receipt.projectEn, projectAr: receipt.projectAr }, locale)].filter(Boolean).join(" · "),
+                    status: t(`fin.method.${receipt.method}`),
+                    tone: "ok",
+                    amount: formatQar(receipt.amount, locale),
+                  }))}
+                  onEdit={(id) => setEditor({ book: "receipts", id })}
+                  onDelete={(id) => {
+                    const receipt = receipts.find((item) => item.id === id);
+                    if (receipt) void remove("receipts", id, receipt.number);
+                  }}
+                />
+              </>
+            ) : null}
             {tab === "journal" ? (
               <div className="card card--flush table-wrap">
                 <table className="table table--cards">
@@ -229,6 +258,7 @@ export function AccountingScreen() {
           invoices={invoices}
           bills={bills}
           expenses={expenses}
+          receipts={receipts}
           onClose={() => setEditor(null)}
           onSaved={(detail) => {
             setEditor(null);
@@ -280,11 +310,21 @@ function BookTable({ rows, empty, onEdit, onDelete, showCategory = false, manage
   );
 }
 
-function RecordModal({ editor, invoices, bills, expenses, onClose, onSaved, getToken }: {
+/** Project a new record starts linked to, with its client (to pre-fill payer / client names). */
+export type ProjectPreset = { projectId: string; projectEn: string; projectAr: string; clientEn: string; clientAr: string };
+
+function linkOf(preset?: ProjectPreset) {
+  return preset ? { projectId: preset.projectId, projectEn: preset.projectEn, projectAr: preset.projectAr } : {};
+}
+
+/** Add/edit form for invoices, bills, expenses and receipts (also used on a project's page). */
+export function RecordModal({ editor, invoices, bills, expenses, receipts, onClose, onSaved, getToken, preset }: {
+  preset?: ProjectPreset;
   editor: { book: Book; id: string | null } | null;
   invoices: Invoice[];
   bills: Bill[];
   expenses: Expense[];
+  receipts: Receipt[];
   onClose: () => void;
   onSaved: (detail: string) => void;
   getToken: () => Promise<string>;
@@ -293,22 +333,23 @@ function RecordModal({ editor, invoices, bills, expenses, onClose, onSaved, getT
   const title = !editor ? "" : t(editor.id ? `fin.edit.${editor.book}` : `fin.add.${editor.book}`);
   return (
     <Modal open={editor !== null} title={title} onClose={onClose}>
-      {editor?.book === "invoices" ? <InvoiceForm record={invoices.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} /> : null}
-      {editor?.book === "bills" ? <BillForm source="bills" record={bills.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} /> : null}
+      {editor?.book === "invoices" ? <InvoiceForm preset={preset} record={invoices.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} /> : null}
+      {editor?.book === "bills" ? <BillForm preset={preset} source="bills" record={bills.find((item) => item.id === editor.id) ?? null} getToken={getToken} onClose={onClose} onSaved={onSaved} /> : null}
       {editor?.book === "expenses" ? <BillForm source="expenses" record={expenseAsBill(expenses.find((item) => item.id === editor.id))} getToken={getToken} onClose={onClose} onSaved={onSaved} /> : null}
+      {editor?.book === "receipts" ? <ReceiptForm preset={preset} key={editor.id ?? "new"} record={receipts.find((item) => item.id === editor.id) ?? null} invoices={invoices} getToken={getToken} onClose={onClose} onSaved={onSaved} /> : null}
     </Modal>
   );
 }
 
-function InvoiceForm({ record, getToken, onClose, onSaved }: FormProps<Invoice>) {
+function InvoiceForm({ record, preset, getToken, onClose, onSaved }: FormProps<Invoice>) {
   const t = useTranslations();
   const locale = useLocale();
   const [form, setForm] = useState<InvoiceInput>(blankInvoice());
   const [error, setError] = useState("");
   useEffect(() => {
-    setForm(record ? (({ id: _id, number: _number, ...input }) => input)(record) : blankInvoice());
+    setForm(record ? (({ id: _id, number: _number, ...input }) => input)(record) : { ...blankInvoice(), ...linkOf(preset), clientEn: preset?.clientEn ?? "", clientAr: preset?.clientAr ?? "" });
     setError("");
-  }, [record]);
+  }, [record, preset]);
   const math = invoiceMath(form.contract, form.progressPct, form.retentionPct);
   return (
     <form className="stack" onSubmit={(event) => {
@@ -323,8 +364,7 @@ function InvoiceForm({ record, getToken, onClose, onSaved }: FormProps<Invoice>)
       <div className="form-grid form-grid--2">
         <Text label={t("off.client")} value={form.clientEn} onChange={(clientEn) => setForm({ ...form, clientEn })} />
         <Text label={t("off.clientAr")} value={form.clientAr} onChange={(clientAr) => setForm({ ...form, clientAr })} />
-        <Text label={t("off.project")} value={form.projectEn} onChange={(projectEn) => setForm({ ...form, projectEn })} />
-        <Text label={t("off.projectAr")} value={form.projectAr} onChange={(projectAr) => setForm({ ...form, projectAr })} />
+        <ProjectSelect id="invoice-project" value={form.projectId} onChange={(projectId, project) => setForm({ ...form, projectId, projectEn: project?.nameEn ?? "", projectAr: project?.nameAr ?? "" })} />
         <NumberField label={t("fin.contract")} value={form.contract} onChange={(contract) => setForm({ ...form, contract })} />
         <NumberField label={t("fin.progress")} value={form.progressPct} max={100} onChange={(progressPct) => setForm({ ...form, progressPct })} />
         <NumberField label={t("fin.retention")} value={form.retentionPct} max={100} onChange={(retentionPct) => setForm({ ...form, retentionPct })} />
@@ -340,14 +380,14 @@ function InvoiceForm({ record, getToken, onClose, onSaved }: FormProps<Invoice>)
   );
 }
 
-function BillForm({ source, record, getToken, onClose, onSaved }: FormProps<Bill> & { source: "bills" | "expenses" }) {
+function BillForm({ source, record, preset, getToken, onClose, onSaved }: FormProps<Bill> & { source: "bills" | "expenses" }) {
   const t = useTranslations();
   const [form, setForm] = useState<BillInput>(blankBill());
   const [error, setError] = useState("");
   useEffect(() => {
-    setForm(record ? (({ id: _id, ...input }) => input)(record) : blankBill());
+    setForm(record ? (({ id: _id, ...input }) => input)(record) : { ...blankBill(), ...(preset ? { ...linkOf(preset), category: "project" as const } : {}) });
     setError("");
-  }, [record]);
+  }, [record, preset]);
   return (
     <form className="stack" onSubmit={(event) => {
       event.preventDefault();
@@ -372,12 +412,68 @@ function BillForm({ source, record, getToken, onClose, onSaved }: FormProps<Bill
         <Text label={t("fin.reference")} value={form.reference} onChange={(reference) => setForm({ ...form, reference })} />
         <Text label={t("fin.supplier")} value={form.supplierEn} onChange={(supplierEn) => setForm({ ...form, supplierEn })} />
         <Text label={t("fin.supplierAr")} value={form.supplierAr} onChange={(supplierAr) => setForm({ ...form, supplierAr })} />
-        <Text label={t("off.project")} value={form.projectEn} onChange={(projectEn) => setForm({ ...form, projectEn })} />
-        <Text label={t("off.projectAr")} value={form.projectAr} onChange={(projectAr) => setForm({ ...form, projectAr })} />
+        <ProjectSelect id="bill-project" none={t("prj.notProject")} value={form.projectId} onChange={(projectId, project) => setForm({ ...form, projectId, projectEn: project?.nameEn ?? "", projectAr: project?.nameAr ?? "" })} />
         <NumberField label={t("fin.amount")} value={form.amount} onChange={(amount) => setForm({ ...form, amount })} />
         <NumberField label={t("fin.paidAmount")} value={form.paid} onChange={(paid) => setForm({ ...form, paid })} />
         <DateField label={t("fin.issuedOn")} value={form.issuedOn} onChange={(issuedOn) => setForm({ ...form, issuedOn })} />
         <DateField label={t("fin.dueOn")} value={form.dueOn} onChange={(dueOn) => setForm({ ...form, dueOn })} />
+      </div>
+      <Field label={t("fin.note")}><textarea className="textarea" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
+      <FormError message={error} />
+      <FormActions onClose={onClose} />
+    </form>
+  );
+}
+
+function blankReceipt(): ReceiptInput {
+  return { projectId: "", projectEn: "", projectAr: "", payerEn: "", payerAr: "", amount: 0, receivedOn: qatarToday(), method: "transfer", reference: "", invoiceId: "", note: "" };
+}
+
+/** Money received from a client; linking an invoice keeps that invoice's "received" amount in step. */
+function ReceiptForm({ record, preset, invoices, getToken, onClose, onSaved }: FormProps<Receipt> & { invoices: Invoice[] }) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const [form, setForm] = useState<ReceiptInput>(() => {
+    if (!record) return { ...blankReceipt(), ...linkOf(preset), payerEn: preset?.clientEn ?? "", payerAr: preset?.clientAr ?? "" };
+    const input = blankReceipt();
+    for (const key of Object.keys(input) as (keyof ReceiptInput)[]) (input as Record<string, unknown>)[key] = record[key];
+    return input;
+  });
+  const [error, setError] = useState("");
+  const choices = invoices.filter((invoice) => invoice.issued && (!form.projectId || invoice.projectId === form.projectId || invoice.id === form.invoiceId));
+  return (
+    <form className="stack" onSubmit={(event) => {
+      event.preventDefault();
+      const problem = receiptProblem(form);
+      if (problem) {
+        setError(t(problem));
+        return;
+      }
+      void saveForm(record ? (token) => updateReceipt(token, record.id, form) : (token) => createReceipt(token, form), getToken, record?.number || form.payerEn, onSaved, setError, t);
+    }}>
+      <div className="form-grid form-grid--2">
+        <ProjectSelect id="receipt-project" value={form.projectId} onChange={(projectId, project) => setForm({ ...form, projectId, projectEn: project?.nameEn ?? "", projectAr: project?.nameAr ?? "", invoiceId: "", payerEn: form.payerEn || project?.clientEn || "", payerAr: form.payerAr || project?.clientAr || "" })} />
+        <Field label={t("fin.againstInvoice")}>
+          <select className="select" value={form.invoiceId} onChange={(event) => {
+            const invoice = invoices.find((item) => item.id === event.target.value);
+            setForm({ ...form, invoiceId: event.target.value, payerEn: form.payerEn || invoice?.clientEn || "", payerAr: form.payerAr || invoice?.clientAr || "" });
+          }}>
+            <option value="">{t("fin.noInvoice")}</option>
+            {choices.map((invoice) => (
+              <option key={invoice.id} value={invoice.id}>{invoice.number} · {partyName(invoice, locale)}</option>
+            ))}
+          </select>
+        </Field>
+        <Text label={t("fin.payer")} value={form.payerEn} onChange={(payerEn) => setForm({ ...form, payerEn })} />
+        <Text label={t("fin.payerAr")} value={form.payerAr} onChange={(payerAr) => setForm({ ...form, payerAr })} />
+        <NumberField label={t("fin.amount")} value={form.amount} onChange={(amount) => setForm({ ...form, amount })} />
+        <DateField label={t("fin.receivedOn")} value={form.receivedOn} onChange={(receivedOn) => setForm({ ...form, receivedOn })} />
+        <Field label={t("fin.methodLabel")}>
+          <select className="select" value={form.method} onChange={(event) => setForm({ ...form, method: event.target.value as ReceiptMethod })}>
+            {receiptMethods.map((method) => <option key={method} value={method}>{t(`fin.method.${method}`)}</option>)}
+          </select>
+        </Field>
+        <Text label={t("fin.reference")} value={form.reference} onChange={(reference) => setForm({ ...form, reference })} />
       </div>
       <Field label={t("fin.note")}><textarea className="textarea" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
       <FormError message={error} />
@@ -426,6 +522,8 @@ function FormError({ message }: { message: string }) {
 
 type FormProps<T> = {
   record: T | null;
+  /** Project to link new records to (when adding from a project's page). */
+  preset?: ProjectPreset;
   getToken: () => Promise<string>;
   onClose: () => void;
   onSaved: (detail: string) => void;
@@ -440,12 +538,12 @@ async function saveForm(action: (token: string) => Promise<{ ok: true; id?: stri
 
 function blankInvoice(): InvoiceInput {
   const today = qatarToday();
-  return { clientEn: "", clientAr: "", projectEn: "", projectAr: "", contract: 0, progressPct: 0, retentionPct: 5, received: 0, issuedOn: today, dueOn: today, issued: false };
+  return { clientEn: "", clientAr: "", projectId: "", projectEn: "", projectAr: "", contract: 0, progressPct: 0, retentionPct: 5, received: 0, issuedOn: today, dueOn: today, issued: false };
 }
 
 function blankBill(): BillInput {
   const today = qatarToday();
-  return { supplierEn: "", supplierAr: "", category: "office", projectEn: "", projectAr: "", reference: "", note: "", issuedOn: today, dueOn: today, amount: 0, paid: 0 };
+  return { supplierEn: "", supplierAr: "", category: "office", projectId: "", projectEn: "", projectAr: "", reference: "", note: "", issuedOn: today, dueOn: today, amount: 0, paid: 0 };
 }
 
 function expenseAsBill(expense: Expense | undefined): Bill | null {
@@ -455,6 +553,7 @@ function expenseAsBill(expense: Expense | undefined): Bill | null {
     supplierEn: expense.vendorEn,
     supplierAr: expense.vendorAr,
     category: expense.category,
+    projectId: expense.projectId,
     projectEn: expense.projectEn,
     projectAr: expense.projectAr,
     reference: expense.reference,
@@ -471,6 +570,7 @@ function expenseInput(form: BillInput): ExpenseInput {
     vendorEn: form.supplierEn,
     vendorAr: form.supplierAr,
     category: form.category,
+    projectId: form.projectId,
     projectEn: form.projectEn,
     projectAr: form.projectAr,
     reference: form.reference,

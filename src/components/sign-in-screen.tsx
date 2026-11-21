@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/components/auth-provider";
+import { AsasLogo } from "@/components/asas-logo";
 import { LanguageSwitch } from "@/components/language-switch";
 import { setTheme } from "@/components/theme";
 import { useRouter } from "@/i18n/navigation";
@@ -36,10 +37,7 @@ export function SignInScreen() {
       <section className="auth-brand">
         <div />
         <div className="logo-lockup">
-          <svg className="logo" aria-hidden="true" viewBox="16 0 272 378">
-            <use href="#i-logo" />
-          </svg>
-          <div className="logo-word">{t("brand.execution")}</div>
+          <AsasLogo className="logo" title="ASAS EXECUTION" />
         </div>
         <div className="bottom">
           <span className="eyebrow">{t("auth.private")}</span>

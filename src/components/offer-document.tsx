@@ -8,7 +8,7 @@ import { Icon } from "@/components/icon";
 import { useOffers } from "@/components/use-offers";
 import { Link } from "@/i18n/navigation";
 import { contractTerms } from "@/lib/contract-terms";
-import { letterhead, lineAmount, offerTotals, paymentAmounts, roomTitle, workTitle, type Offer, type OfferKind } from "@/lib/offers";
+import { letterhead, lineAmount, lineQty, offerTotals, paymentAmounts, roomTitle, totalArea, workTitle, type Offer, type OfferKind } from "@/lib/offers";
 
 export function OfferDocument({ offerId, doc, autoPrint = false }: { offerId: string; doc: "quotation" | "contract"; autoPrint?: boolean }) {
   const t = useTranslations();
@@ -105,10 +105,10 @@ function Foot({ offer }: { offer: Offer }) {
 }
 
 function QuotationSheets({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discountPct, offer.packageAmount);
+  const totals = offerTotals(offer.lines, offer.discountPct);
   const due = paymentAmounts(totals.total, offer.payments);
   const { en: title, ar: titleAr } = docTitles[offer.kind].quotation;
-  const area = areaLabel(offer.areaFrom, offer.areaTo);
+  const area = areaLabel(totalArea(offer.lines));
   const scope = linesOf(offer.scopeEn);
   const scopeAr = linesOf(offer.scopeAr);
 
@@ -165,10 +165,10 @@ function QuotationSheets({ offer }: { offer: Offer }) {
 }
 
 function ContractSheets({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discountPct, offer.packageAmount);
+  const totals = offerTotals(offer.lines, offer.discountPct);
   const due = paymentAmounts(totals.total, offer.payments);
   const { en: title, ar: titleAr } = docTitles[offer.kind].contract;
-  const area = areaLabel(offer.areaFrom, offer.areaTo);
+  const area = areaLabel(totalArea(offer.lines));
 
   return (
     <>
@@ -286,7 +286,7 @@ function Lines({ offer }: { offer: Offer }) {
           <tr key={`${line.roomEn}-${index}`}>
             <td>{roomTitle(line, "en")}<br /><span className="sheet-ar">{roomTitle(line, "ar")}</span></td>
             <td>{workTitle(line, "en")}<br /><span className="sheet-ar">{workTitle(line, "ar")}</span></td>
-            <td className="num">{line.qty}</td>
+            <td className="num">{lineQty(line)}</td>
             <td>{line.unit}</td>
             <td className="num">{money(line.rate)}</td>
             <td className="num">{money(lineAmount(line))}</td>
@@ -311,10 +311,8 @@ function linesOf(value: string) {
   return value.split("\n").map((line) => line.trim()).filter(Boolean);
 }
 
-function areaLabel(from: number | null, to: number | null) {
-  if (from && to && from !== to) return `${from} to ${to}`;
-  if (from || to) return String(from ?? to);
-  return "";
+function areaLabel(area: number) {
+  return area > 0 ? new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(area) : "";
 }
 
 function money(amount: number) {

@@ -5,6 +5,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { reportServices, workStatuses, type ReportInput, type WorkItem } from "@/lib/reports";
 import type { ActionResult } from "@/lib/directory";
 import { canReadAll, canWriteModule, seesOwn } from "@/lib/access";
+import { projectLink } from "@/server/project-link";
 import { actor, audit, type Gate } from "@/server/session";
 import { removePrivateFile, signedReadUrl } from "@/server/blobs";
 
@@ -33,6 +34,7 @@ function clean(input: ReportInput): ReportInput | null {
     items.push({ area, work, done, status: item.status });
   }
   return {
+    projectId: input.projectId,
     projectEn,
     projectAr,
     date,
@@ -44,6 +46,13 @@ function clean(input: ReportInput): ReportInput | null {
     issues: input.issues.trim().slice(0, 4000),
     items,
   };
+}
+
+/** Every report belongs to a project; its names are copied from the project. */
+async function withProject(input: ReportInput): Promise<ReportInput | string> {
+  if (!input.projectId) return "rep.needProject";
+  const link = await projectLink(input.projectId);
+  return link ? { ...input, ...link } : "prj.missingProject";
 }
 
 async function manager(idToken: string, reportId?: string) {
@@ -69,7 +78,9 @@ export async function createProjectReport(idToken: string, input: ReportInput): 
   try {
     const who = await manager(idToken);
     if ("error" in who) return { ok: false, error: who.error };
-    const report = clean(input);
+    const linked = await withProject(input);
+    if (typeof linked === "string") return { ok: false, error: linked };
+    const report = clean(linked);
     if (!report) return { ok: false, error: "us.invalid" };
     const ref = await adminDb().collection("projectReports").add({
       ...report,
@@ -87,7 +98,9 @@ export async function updateProjectReport(idToken: string, reportId: string, inp
   try {
     const who = await manager(idToken, reportId);
     if ("error" in who) return { ok: false, error: who.error };
-    const report = clean(input);
+    const linked = await withProject(input);
+    if (typeof linked === "string") return { ok: false, error: linked };
+    const report = clean(linked);
     if (!report) return { ok: false, error: "us.invalid" };
     const ref = adminDb().collection("projectReports").doc(reportId);
     const snap = await ref.get();

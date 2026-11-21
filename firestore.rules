@@ -69,6 +69,7 @@ service cloud.firestore {
         : role == "accountant" && (module == "documents" || module == "email") ? "own"
         : role == "staff" && (module == "hr" || module == "documents" || module == "email") ? "own"
         : role == "staff" && module == "payroll" ? "own"
+        : (role == "engineer" || role == "accountant") && module == "projects" ? "view"
         : "none";
     }
 
@@ -174,6 +175,18 @@ service cloud.firestore {
 
     match /payrollRuns/{id} {
       allow read: if readsAll("payroll");
+      allow write: if false;
+    }
+
+    // Projects (client details and budget are private; the website reads them server-side)
+    match /projects/{id} {
+      allow read: if readsAll("projects");
+      allow write: if false;
+    }
+
+    // Payment receipts (money received), managed through server actions
+    match /receipts/{id} {
+      allow read: if readsAll("accounting");
       allow write: if false;
     }
 

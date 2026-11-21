@@ -157,6 +157,9 @@ img, svg { display: block; max-width: 100%; }
 }
 .brand { display: flex; align-items: center; gap: 12px; padding: 0 12px 18px; }
 .brand svg { width: 28px; height: 40px; fill: var(--mist); }
+/* Letterhead logo (same artwork as the contract / quotation PDFs) */
+.brand { padding-block: 4px 22px; }
+.brand .brand-logo { width: 46px; height: auto; aspect-ratio: 82.85 / 198.2; fill: none; color: #B8BDC7; }
 .brand b { display: block; color: #F2F2F2; font-size: 15px; letter-spacing: 3px; font-weight: 600; }
 .brand small { display: block; font-size: 9.5px; letter-spacing: 3px; color: var(--steel); }
 .nav-label { padding: 16px 14px 6px; font-size: 10.5px; letter-spacing: 2px; font-weight: 600; color: #5E6064; text-transform: uppercase; }
@@ -465,7 +468,7 @@ img, svg { display: block; max-width: 100%; }
   background-size: 300px 100%; background-repeat: no-repeat; background-position: center;
 }
 .auth-brand .logo-lockup { flex: none; display: flex; flex-direction: column; align-items: center; margin-block: 32px; }
-.auth-brand .logo { width: 168px; height: auto; aspect-ratio: 252 / 366; fill: var(--mist); overflow: visible; }
+.auth-brand .logo { width: 120px; height: auto; aspect-ratio: 82.85 / 198.2; color: #B8BDC7; overflow: visible; }
 .auth-brand .logo-word { text-align: center; letter-spacing: 9px; color: var(--mist); font-size: 18px; margin-top: 28px; }
 .auth-brand .eyebrow { color: var(--champagne); }
 .auth-form { position: relative; display: grid; place-items: center; padding: 48px 24px; }
@@ -527,7 +530,7 @@ img, svg { display: block; max-width: 100%; }
   .auth { grid-template-columns: 1fr; }
   .auth-brand { min-height: 280px; padding: 32px 24px; }
   .auth-brand .logo-lockup { margin-block: 16px; }
-  .auth-brand .logo { width: 88px; }
+  .auth-brand .logo { width: 64px; }
   .auth-brand .bottom { display: none; }
   .auth-form { place-items: start center; padding: 24px 18px; }
   .auth-form .lang { top: -200px; inset-inline-end: 16px; }
@@ -568,51 +571,51 @@ img, svg { display: block; max-width: 100%; }
 }
 
 /* HR stays readable from a wide desktop down to a phone, in both directions. */
-:is(.hr, .rep, .docs, .pay, .acc, .web) { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-:is(.hr, .rep, .docs, .pay, .acc, .web) .page-title, :is(.hr, .rep, .docs, .pay, .acc, .web) .kpi .label, :is(.hr, .rep, .docs, .pay, .acc, .web) .kpi .note, :is(.hr, .rep, .docs, .pay, .acc, .web) .kv b { overflow-wrap: anywhere; }
-:is(.hr, .rep, .docs, .pay, .acc, .web) .search { width: min(320px, 100%); }
-:is(.hr, .rep, .docs, .pay, .acc, .web) .tabs { display: flex; width: max-content; max-width: 100%; }
-:is(.hr, .rep, .docs, .pay, .acc, .web) .tab { flex: none; }
-:is(.hr, .rep, .docs, .pay, .acc, .web) .between { flex-wrap: wrap; }
-:is(.hr, .rep, .docs, .pay, .acc, .web) .file-chip { max-width: 100%; }
+:is(.hr, .rep, .docs, .pay, .acc, .web, .prj) { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+:is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .page-title, :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .kpi .label, :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .kpi .note, :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .kv b { overflow-wrap: anywhere; }
+:is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .search { width: min(320px, 100%); }
+:is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .tabs { display: flex; width: max-content; max-width: 100%; }
+:is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .tab { flex: none; }
+:is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .between { flex-wrap: wrap; }
+:is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .file-chip { max-width: 100%; }
 .docs-nav { width: 220px; flex: none; }
 @media (max-width: 1024px) {
   .docs-nav { width: 100%; flex-direction: row; overflow-x: auto; }
   .docs-nav .nav-item { flex: none; }
 }
-:is(.hr, .rep, .docs, .pay, .acc, .web) .modal .hstack { width: 100%; }
+:is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .modal .hstack { width: 100%; }
 @media (max-width: 1024px) {
-  :is(.hr, .rep, .docs, .pay, .acc, .web) { gap: 14px; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .search { width: 100%; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .page-actions { width: 100%; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .between > .hstack { width: 100%; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards thead { display: none; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards, :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards tbody, :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards tr, :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards td { display: block; width: 100%; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .card--flush.table-wrap:not(:has(.between)) { background: transparent; border: 0; box-shadow: none; overflow: visible; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .card--flush.table-wrap:has(.between),
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .card > .table-wrap { padding: 0 12px 12px; overflow: visible; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards tr { border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; margin: 0 0 10px; width: auto; background: var(--surface); }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards td { border: 0; padding: 6px 0; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 12px; text-align: end; min-width: 0; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards td:first-child { justify-content: flex-start; text-align: start; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards td::before { flex: none; padding-top: 2px; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards td > .file-chip,
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards td > .hstack,
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards td > .select,
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards td > .input { flex: 1 1 100%; width: 100%; max-width: 100%; margin-top: 4px; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .card > .hstack .btn { flex: 1; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards td > .hstack { justify-content: flex-start; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards td[data-label=""] > .hstack { justify-content: flex-end; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards .person { min-width: 0; flex: 1; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .table--cards .person b { overflow-wrap: anywhere; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .ai { flex-wrap: wrap; align-items: flex-start; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .ai > .grow { min-width: 0; flex: 1 1 calc(100% - 36px); }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .ai > .btn { width: 100%; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .modal .hstack .btn { flex: 1; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) { gap: 14px; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .search { width: 100%; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .page-actions { width: 100%; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .between > .hstack { width: 100%; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards thead { display: none; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards, :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards tbody, :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards tr, :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards td { display: block; width: 100%; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .card--flush.table-wrap:not(:has(.between)) { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .card--flush.table-wrap:has(.between),
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .card > .table-wrap { padding: 0 12px 12px; overflow: visible; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards tr { border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; margin: 0 0 10px; width: auto; background: var(--surface); }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards td { border: 0; padding: 6px 0; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px 12px; text-align: end; min-width: 0; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards td:first-child { justify-content: flex-start; text-align: start; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards td::before { flex: none; padding-top: 2px; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards td > .file-chip,
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards td > .hstack,
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards td > .select,
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards td > .input { flex: 1 1 100%; width: 100%; max-width: 100%; margin-top: 4px; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .card > .hstack .btn { flex: 1; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards td > .hstack { justify-content: flex-start; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards td[data-label=""] > .hstack { justify-content: flex-end; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards .person { min-width: 0; flex: 1; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .table--cards .person b { overflow-wrap: anywhere; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .ai { flex-wrap: wrap; align-items: flex-start; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .ai > .grow { min-width: 0; flex: 1 1 calc(100% - 36px); }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .ai > .btn { width: 100%; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .modal .hstack .btn { flex: 1; }
 }
 @media (max-width: 720px) {
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .page-header .hstack .btn--secondary { display: inline-flex; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .page-actions .btn { flex: 1 1 auto; }
-  :is(.hr, .rep, .docs, .pay, .acc, .web) .grid-5 { grid-template-columns: 1fr; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .page-header .hstack .btn--secondary { display: inline-flex; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .page-actions .btn { flex: 1 1 auto; }
+  :is(.hr, .rep, .docs, .pay, .acc, .web, .prj) .grid-5 { grid-template-columns: 1fr; }
 }
 .pay td .input, .pay td .select { width: 8.5rem; }
 .ntf { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
@@ -901,3 +904,12 @@ img, svg { display: block; max-width: 100%; }
 @media (max-width: 720px) {
   .kind-pick { grid-template-columns: 1fr; }
 }
+
+/* Projects */
+.prj-row { cursor: pointer; }
+.prj-row:hover td { background: var(--surface-sunken); }
+.prj-over { color: var(--danger); }
+.prj-filters { flex-wrap: wrap; }
+.prj-filters .search { flex: 1 1 280px; }
+.prj-form__section { margin: 8px 0 -4px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); border-top: 1px solid var(--border); padding-top: 14px; }
+.prj-form__section:first-of-type { border-top: 0; padding-top: 0; }

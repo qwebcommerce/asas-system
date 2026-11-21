@@ -55,7 +55,7 @@ export function OfferScreen() {
             <tbody>
               {ordered.length === 0 ? <tr><td colSpan={7}>{ready ? t("off.empty") : t("common.loading")}</td></tr> : null}
               {ordered.map((offer) => {
-                const totals = offerTotals(offer.lines, offer.discountPct, offer.packageAmount);
+                const totals = offerTotals(offer.lines, offer.discountPct);
                 return (
                   <tr key={offer.id}>
                     <td data-label={t("off.number")} className="num"><bdi>{offer.number}</bdi></td>

@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { FilePick, StoredPreview } from "@/components/file-pick";
 import { Icon } from "@/components/icon";
+import { ProjectSelect } from "@/components/project-select";
 import { sortDocuments, useDocuments } from "@/components/use-documents";
 import { Modal, Toast } from "@/components/ui/overlay";
 import { Link } from "@/i18n/navigation";
@@ -208,6 +209,7 @@ function DocumentModal({
   const [titleEn, setTitleEn] = useState("");
   const [titleAr, setTitleAr] = useState("");
   const [kind, setKind] = useState<DocumentKind>("contract");
+  const [projectId, setProjectId] = useState("");
   const [projectEn, setProjectEn] = useState("");
   const [projectAr, setProjectAr] = useState("");
   const [hasExpiry, setHasExpiry] = useState(false);
@@ -223,6 +225,7 @@ function DocumentModal({
     setTitleEn(document?.titleEn ?? "");
     setTitleAr(document?.titleAr ?? "");
     setKind(document?.kind ?? "contract");
+    setProjectId(document?.projectId ?? "");
     setProjectEn(document?.projectEn ?? "");
     setProjectAr(document?.projectAr ?? "");
     setHasExpiry(document?.hasExpiry ?? false);
@@ -237,6 +240,7 @@ function DocumentModal({
     setTitleEn(next?.titleEn ?? "");
     setTitleAr(next?.titleAr ?? "");
     setKind(next?.kind ?? "contract");
+    setProjectId(next?.projectId ?? "");
     setProjectEn(next?.projectEn ?? "");
     setProjectAr(next?.projectAr ?? "");
     setHasExpiry(next?.hasExpiry ?? false);
@@ -269,7 +273,7 @@ function DocumentModal({
         return;
       }
     }
-    const input: LibraryDocumentInput = { titleEn, titleAr, kind, projectEn, projectAr, hasExpiry, expiresOn };
+    const input: LibraryDocumentInput = { titleEn, titleAr, kind, projectId, projectEn, projectAr, hasExpiry, expiresOn };
     setSaving(true);
     const existingId = document?.id || savedId;
     const result = existingId
@@ -320,6 +324,7 @@ function DocumentModal({
         titleEn={titleEn}
         titleAr={titleAr}
         kind={kind}
+        projectId={projectId}
         projectEn={projectEn}
         projectAr={projectAr}
         hasExpiry={hasExpiry}
@@ -332,8 +337,11 @@ function DocumentModal({
         onTitleEn={setTitleEn}
         onTitleAr={setTitleAr}
         onKind={setKind}
-        onProjectEn={setProjectEn}
-        onProjectAr={setProjectAr}
+        onProject={(id, en, ar) => {
+          setProjectId(id);
+          setProjectEn(en);
+          setProjectAr(ar);
+        }}
         onHasExpiry={(value) => {
           setHasExpiry(value);
           if (!value) setExpiresOn("");
@@ -354,6 +362,7 @@ function DocumentForm({
   titleEn,
   titleAr,
   kind,
+  projectId,
   projectEn,
   projectAr,
   hasExpiry,
@@ -366,8 +375,7 @@ function DocumentForm({
   onTitleEn,
   onTitleAr,
   onKind,
-  onProjectEn,
-  onProjectAr,
+  onProject,
   onHasExpiry,
   onExpiresOn,
   onFile,
@@ -380,6 +388,7 @@ function DocumentForm({
   titleEn: string;
   titleAr: string;
   kind: DocumentKind;
+  projectId: string;
   projectEn: string;
   projectAr: string;
   hasExpiry: boolean;
@@ -392,8 +401,7 @@ function DocumentForm({
   onTitleEn: (value: string) => void;
   onTitleAr: (value: string) => void;
   onKind: (value: DocumentKind) => void;
-  onProjectEn: (value: string) => void;
-  onProjectAr: (value: string) => void;
+  onProject: (projectId: string, projectEn: string, projectAr: string) => void;
   onHasExpiry: (value: boolean) => void;
   onExpiresOn: (value: string) => void;
   onFile: (value: File | null) => void;
@@ -410,9 +418,8 @@ function DocumentForm({
       <div className="form-grid form-grid--2">
         <Field label={t("doc.titleEn")} value={titleEn} onChange={onTitleEn} />
         <Field label={t("doc.titleAr")} value={titleAr} onChange={onTitleAr} />
-        <Field label={t("doc.project")} value={projectEn} onChange={onProjectEn} />
-        <Field label={t("doc.projectAr")} value={projectAr} onChange={onProjectAr} />
       </div>
+      <ProjectSelect id="doc-project" value={projectId} onChange={(id, project) => onProject(id, project?.nameEn ?? (id ? projectEn : ""), project?.nameAr ?? (id ? projectAr : ""))} />
       <div className="field">
         <label>{t("col.type")}</label>
         <select className="select" value={kind} onChange={(event) => onKind(event.target.value as DocumentKind)}>

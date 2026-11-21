@@ -6,6 +6,7 @@ import { qatarToday } from "@/lib/hr";
 import { inferShape, measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
 import { adminDb } from "@/lib/firebase-admin";
 import { canWriteModule, seesOwn } from "@/lib/access";
+import { projectLink } from "@/server/project-link";
 import { actor, audit, type Gate } from "@/server/session";
 
 function dim(value: number | null) {
@@ -28,7 +29,7 @@ function clean(input: OfferInput): OfferInput | string {
   for (const line of input.lines) {
     const roomEn = line.roomEn.trim();
     const roomAr = line.roomAr.trim();
-    const blank = !roomEn && !roomAr && line.l === null && line.w === null && line.h === null;
+    const blank = !roomEn && !roomAr && line.l === null && line.w === null && line.h === null && !line.qty;
     if (blank) continue;
     const price = priceById(line.priceId);
     if (!price || !roomEn || !roomAr) return "us.invalid";
@@ -39,11 +40,13 @@ function clean(input: OfferInput): OfferInput | string {
     if ((line.l !== null && l === null) || (line.w !== null && w === null) || (line.h !== null && h === null)) return "us.invalid";
     const unit = offerUnits.find((entry) => entry === line.unit) ?? price.unit;
     const shape = inferShape(unit, price.trade, h, line.shape);
-    const usedL = shape === "count" ? null : l;
+    const usedL = shape === "count" || shape === "direct" ? null : l;
     const usedW = shape === "walls" || shape === "area" ? w : null;
     const usedH = shape === "walls" ? h : null;
     const qty = measureQty(shape, usedL, usedW, usedH, line.qty);
-    if (shape === "count" && (!Number.isFinite(line.qty) || line.qty < 0 || line.qty > 100_000)) return "us.invalid";
+    if ((shape === "count" || shape === "direct") && (!Number.isFinite(line.qty) || line.qty < 0 || line.qty > 1_000_000)) return "us.invalid";
+    const units = Number.isInteger(line.units) && line.units >= 1 && line.units <= 999 ? line.units : null;
+    if (units === null) return "off.needUnits";
     lines.push({
       roomEn,
       roomAr,
@@ -58,6 +61,7 @@ function clean(input: OfferInput): OfferInput | string {
       unit,
       shape,
       rate: Math.round(line.rate * 100) / 100,
+      units,
     });
   }
   const stages: OfferStage[] = [];
@@ -88,9 +92,7 @@ function clean(input: OfferInput): OfferInput | string {
     reference: input.reference.trim().slice(0, 40),
     kind: input.kind,
     issuedOn: input.issuedOn,
-    areaFrom: input.areaFrom,
-    areaTo: input.areaTo,
-    packageAmount: input.packageAmount,
+    projectId: typeof input.projectId === "string" ? input.projectId.trim().slice(0, 64) : "",
     scopeEn: input.scopeEn.trim().slice(0, 800),
     scopeAr: input.scopeAr.trim().slice(0, 800),
     stages,
@@ -139,6 +141,7 @@ export async function createOffer(idToken: string, input: OfferInput): Promise<A
     if ("error" in who) return { ok: false, error: who.error };
     const offer = clean(input);
     if (typeof offer === "string") return { ok: false, error: offer };
+    if (offer.projectId && !(await projectLink(offer.projectId))) return { ok: false, error: "prj.missingProject" };
     const existing = await adminDb().collection("offers").get();
     const number = nextNumber(existing.docs.map((item) => (typeof item.data().number === "string" ? item.data().number : "")));
     const ref = await adminDb().collection("offers").add({
@@ -160,6 +163,7 @@ export async function updateOffer(idToken: string, offerId: string, input: Offer
     if ("error" in who) return { ok: false, error: who.error };
     const offer = clean(input);
     if (typeof offer === "string") return { ok: false, error: offer };
+    if (offer.projectId && !(await projectLink(offer.projectId))) return { ok: false, error: "prj.missingProject" };
     const ref = adminDb().collection("offers").doc(offerId);
     const snap = await ref.get();
     if (!snap.exists) return { ok: false, error: "us.invalid" };

@@ -9,6 +9,8 @@ export type LibraryDocument = {
   titleEn: string;
   titleAr: string;
   kind: DocumentKind;
+  /** Linked project ("" if none). */
+  projectId: string;
   projectEn: string;
   projectAr: string;
   hasExpiry: boolean;
@@ -24,6 +26,7 @@ export type LibraryDocumentInput = {
   titleEn: string;
   titleAr: string;
   kind: DocumentKind;
+  projectId: string;
   projectEn: string;
   projectAr: string;
   hasExpiry: boolean;
@@ -68,6 +71,7 @@ export function mapLibraryDocument(id: string, data: Record<string, unknown>): L
     titleEn,
     titleAr: text(data.titleAr),
     kind,
+    projectId: text(data.projectId),
     projectEn: text(data.projectEn),
     projectAr: text(data.projectAr),
     hasExpiry: data.hasExpiry === true && Boolean(expiresOn),
