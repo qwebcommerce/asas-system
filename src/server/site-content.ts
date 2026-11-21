@@ -3,7 +3,7 @@ import { adminDb, isAdminConfigured } from "@/lib/firebase-admin";
 import { mapBlogPost, mapSiteDocument, pick, type BlogCategory, type SiteDocCategory } from "@/lib/website";
 import type { OfferKind } from "@/lib/offers";
 import { mapProject } from "@/lib/projects";
-import { sampleDocuments, sampleProjects, samplePosts, type SamplePhoto, type SampleProjectPhoto } from "@/lib/website-samples";
+import { sampleDocuments, sampleProjects, samplePosts, type SamplePhoto, type SampleProjectPhoto, type SampleProjectThumb } from "@/lib/website-samples";
 
 /*
  * Content for the public website pages.
@@ -166,19 +166,24 @@ export async function siteDocuments(locale: string): Promise<{ documents: Docume
 
 // ---------------------------------------------------------------- projects
 
-export type ProjectCover = { kind: "sample"; photo: SampleProjectPhoto } | { kind: "stored"; src: string };
+export type ProjectCover = { kind: "sample"; photo: SampleProjectPhoto | SampleProjectThumb } | { kind: "stored"; src: string };
 
 /** Public view of a project. Client details, budget and notes are never included. */
 export type ProjectView = {
   slug: string;
   name: string;
   kind: OfferKind;
+  /** Small label above the name (type of work) */
   scope: string;
+  /** Line under the name (disciplines, or location and year) */
+  meta: string;
   location: string;
   summary: string;
   year: string;
   cover: ProjectCover;
   coverAlt: string;
+  /** Gallery photos under the cover (up to two) */
+  thumbs: ProjectCover[];
 };
 
 type PublicProject = {
@@ -192,7 +197,15 @@ type PublicProject = {
   summaryEn: string;
   summaryAr: string;
   year: string;
+  /** Version tags of the cover and gallery photos (changes when a photo is replaced, so caches refresh) */
+  coverVersion: string;
+  photos: { photo: number; version: string }[];
 };
+
+/** Short tag from a stored file name ("website/projects/<id>/<uuid>.jpg" -> first 8 characters of the uuid). */
+function fileVersion(path: unknown) {
+  return typeof path === "string" ? (path.split("/").pop() ?? "").slice(0, 8) : "";
+}
 
 async function storedProjects(): Promise<PublicProject[]> {
   "use cache";
@@ -201,6 +214,7 @@ async function storedProjects(): Promise<PublicProject[]> {
   if (!isAdminConfigured()) return [];
   try {
     const snap = await adminDb().collection("projects").where("published", "==", true).get();
+    const raw = new Map(snap.docs.map((doc) => [doc.id, doc.data()]));
     return snap.docs
       .flatMap((doc) => mapProject(doc.id, doc.data()) ?? [])
       .filter((project) => project.hasCover && project.slug)
@@ -217,6 +231,8 @@ async function storedProjects(): Promise<PublicProject[]> {
         summaryEn: project.summaryEn,
         summaryAr: project.summaryAr,
         year: (project.endOn || project.startOn).slice(0, 4),
+        coverVersion: fileVersion(raw.get(project.id)?.coverPath),
+        photos: project.gallery.flatMap((has, i) => (has ? [{ photo: i + 1, version: fileVersion(raw.get(project.id)?.[`photo${i + 1}Path`]) }] : [])),
       }));
   } catch (error) {
     console.error("website projects unavailable", error);
@@ -235,11 +251,13 @@ export async function siteProjects(locale: string, kindLabel: (kind: OfferKind) 
         name: pick(project.nameEn, project.nameAr, locale),
         kind: project.kind,
         scope: kindLabel(project.kind),
+        meta: [pick(project.locationEn, project.locationAr, locale), project.year].filter(Boolean).join(" · "),
         location: pick(project.locationEn, project.locationAr, locale),
         summary: pick(project.summaryEn, project.summaryAr, locale),
         year: project.year,
-        cover: { kind: "stored", src: `/api/site-files/project/${project.id}` },
+        cover: { kind: "stored", src: `/api/site-files/project/${project.id}?v=${project.coverVersion}` },
         coverAlt: pick(project.nameEn, project.nameAr, locale),
+        thumbs: project.photos.map(({ photo, version }) => ({ kind: "stored" as const, src: `/api/site-files/project/${project.id}?photo=${photo}&v=${version}` })),
       })),
     };
   }
@@ -250,11 +268,13 @@ export async function siteProjects(locale: string, kindLabel: (kind: OfferKind) 
       name: pick(project.nameEn, project.nameAr, locale),
       kind: project.kind,
       scope: pick(project.scopeEn, project.scopeAr, locale),
+      meta: pick(project.metaEn, project.metaAr, locale),
       location: pick(project.locationEn, project.locationAr, locale),
       summary: pick(project.summaryEn, project.summaryAr, locale),
       year: project.year,
       cover: { kind: "sample", photo: project.photo },
       coverAlt: pick(project.altEn, project.altAr, locale),
+      thumbs: project.thumbs.map((photo) => ({ kind: "sample" as const, photo })),
     })),
   };
 }

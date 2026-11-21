@@ -11,8 +11,8 @@ import { Modal, Toast } from "@/components/ui/overlay";
 import { Link, useRouter } from "@/i18n/navigation";
 import { fileProblem, resolveStoredType } from "@/lib/files";
 import { offerKinds } from "@/lib/offers";
-import { PROJECT_LIMITS, projectName, projectProblems, projectStatuses, type Project, type ProjectInput, type ProjectStatus } from "@/lib/projects";
-import { clearProjectCover, createProject, openProjectCover, updateProject } from "@/server/projects";
+import { PROJECT_LIMITS, projectImageSlots, projectName, projectProblems, projectStatuses, type Project, type ProjectImageSlot, type ProjectInput, type ProjectStatus } from "@/lib/projects";
+import { clearProjectImage, createProject, openProjectImage, updateProject } from "@/server/projects";
 
 type GetToken = () => Promise<string>;
 
@@ -233,19 +233,21 @@ function ProjectForm({
   const [failure, setFailure] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState("");
-  const [cover, setCover] = useState<File | null>(null);
-  const [dropCover, setDropCover] = useState(false);
-  const [stored, setStored] = useState("");
-  const thumb = useMemo(() => (cover ? URL.createObjectURL(cover) : ""), [cover]);
-  useEffect(() => () => {
-    if (thumb) URL.revokeObjectURL(thumb);
-  }, [thumb]);
+  // Website images (cover + two gallery photos): a newly chosen file, or "remove the stored one"
+  const [picked, setPicked] = useState<Record<ProjectImageSlot, File | null>>({ cover: null, photo1: null, photo2: null });
+  const [dropped, setDropped] = useState<Record<ProjectImageSlot, boolean>>({ cover: false, photo1: false, photo2: false });
+  const [stored, setStored] = useState<Record<ProjectImageSlot, string>>({ cover: "", photo1: "", photo2: "" });
+  const hasStored = (slot: ProjectImageSlot) => (slot === "cover" ? Boolean(existing?.hasCover) : Boolean(existing?.gallery[slot === "photo1" ? 0 : 1]));
+  const keeps = (slot: ProjectImageSlot) => hasStored(slot) && !dropped[slot];
   useEffect(() => {
-    if (!existing?.hasCover) return;
+    if (!existing) return;
     let active = true;
     void (async () => {
-      const result = await openProjectCover(await getToken(), existing.id);
-      if (active && result.ok) setStored(result.url);
+      for (const slot of projectImageSlots) {
+        if (!(slot === "cover" ? existing.hasCover : existing.gallery[slot === "photo1" ? 0 : 1])) continue;
+        const result = await openProjectImage(await getToken(), existing.id, slot);
+        if (active && result.ok) setStored((current) => ({ ...current, [slot]: result.url }));
+      }
     })();
     return () => {
       active = false;
@@ -258,14 +260,14 @@ function ProjectForm({
     setErrors((current) => ({ ...current, [key]: "" }));
   }
 
-  async function chooseCover(file: File | null) {
+  async function chooseImage(slot: ProjectImageSlot, file: File | null) {
     if (!file) return;
     const type = resolveStoredType(file.type, file.name);
-    if (!type || !type.startsWith("image/") || !(await looksLikeImage(file))) return setErrors((c) => ({ ...c, cover: "web.imageOnly" }));
-    if (fileProblem(file.type, file.size, file.name)) return setErrors((c) => ({ ...c, cover: "web.imageSize" }));
-    setCover(file);
-    setDropCover(false);
-    setErrors((c) => ({ ...c, cover: "" }));
+    if (!type || !type.startsWith("image/") || !(await looksLikeImage(file))) return setErrors((c) => ({ ...c, [slot]: "web.imageOnly" }));
+    if (fileProblem(file.type, file.size, file.name)) return setErrors((c) => ({ ...c, [slot]: "web.imageSize" }));
+    setPicked((current) => ({ ...current, [slot]: file }));
+    setDropped((current) => ({ ...current, [slot]: false }));
+    setErrors((c) => ({ ...c, [slot]: "" }));
   }
 
   async function save() {
@@ -274,8 +276,7 @@ function ProjectForm({
     const input: ProjectInput = { ...form, budget: amount };
     const problems = projectProblems(input);
     if (budget.trim() !== "" && (!Number.isInteger(amount) || amount < 0)) problems.budget = "prj.badBudget";
-    const keepsCover = Boolean(existing?.hasCover) && !dropCover;
-    if (input.published && !cover && !keepsCover) problems.cover = "prj.coverRequired";
+    if (input.published && !picked.cover && !keeps("cover")) problems.cover = "prj.coverRequired";
     setErrors(problems);
     if (Object.values(problems).some(Boolean)) return;
     setSaving(true);
@@ -289,19 +290,24 @@ function ProjectForm({
         return;
       }
       setSavedId(result.id);
-      if (dropCover && !cover) await clearProjectCover(await getToken(), result.id);
-      if (cover) {
+      // Images upload only now, after the project is saved
+      for (const slot of projectImageSlots) {
+        const file = picked[slot];
+        if (dropped[slot] && !file) await clearProjectImage(await getToken(), result.id, slot);
+        if (!file) continue;
         const body = new FormData();
         body.set("token", await getToken());
         body.set("purpose", "project");
+        body.set("slot", slot);
         body.set("id", result.id);
-        body.set("file", cover);
+        body.set("file", file);
         const response = await fetch("/api/website/files", { method: "POST", body });
         const payload = (await response.json()) as { ok: boolean; error?: string };
         if (!payload.ok) {
-          setErrors((c) => ({ ...c, cover: payload.error ?? "auth.failed" }));
+          setErrors((c) => ({ ...c, [slot]: payload.error ?? "auth.failed" }));
           return;
         }
+        setPicked((current) => ({ ...current, [slot]: null }));
       }
       onSaved(locale === "ar" ? input.nameAr || input.nameEn : input.nameEn || input.nameAr, result.id, !existing);
     } catch {
@@ -311,7 +317,19 @@ function ProjectForm({
     }
   }
 
-  const keepsCover = Boolean(existing?.hasCover) && !dropCover;
+  const imageField = (slot: ProjectImageSlot, label: string, hint: string) => (
+    <ImageField
+      label={label}
+      hint={hint}
+      file={picked[slot]}
+      keeps={keeps(slot)}
+      storedUrl={stored[slot]}
+      error={errors[slot] ? t(errors[slot]) : ""}
+      onChoose={(file) => void chooseImage(slot, file)}
+      onRemoveNew={() => setPicked((current) => ({ ...current, [slot]: null }))}
+      onRemoveStored={() => setDropped((current) => ({ ...current, [slot]: true }))}
+    />
+  );
 
   return (
     <form className="stack" noValidate onSubmit={(event) => { event.preventDefault(); void save(); }}>
@@ -374,31 +392,10 @@ function ProjectForm({
             <Text label={t("prj.summary")} lang="en" multiline value={form.summaryEn} max={PROJECT_LIMITS.summary} error={errors.summaryEn} onChange={(v) => set("summaryEn", v)} />
             <Text label={t("prj.summary")} lang="ar" multiline value={form.summaryAr} max={PROJECT_LIMITS.summary} error={errors.summaryAr} onChange={(v) => set("summaryAr", v)} />
           </div>
-          <div className={`field${errors.cover ? " field--invalid" : ""}`}>
-            <label>{t("prj.cover")}</label>
-            {cover ? (
-              <div className="file-chip">
-                {/* eslint-disable-next-line @next/next/no-img-element -- local preview */}
-                <img className="file-chip__thumb" src={thumb} alt="" />
-                <div className="grow"><b>{cover.name}</b></div>
-                <button type="button" className="icon-btn file-chip__remove" aria-label={t("hr.fileRemove")} onClick={() => setCover(null)}><Icon name="x" className="icon icon--sm" /></button>
-              </div>
-            ) : keepsCover ? (
-              <div className="file-chip">
-                {/* eslint-disable-next-line @next/next/no-img-element -- signed preview */}
-                {stored ? <img className="file-chip__thumb" src={stored} alt="" /> : <span className="file-chip__thumb file-chip__thumb--icon"><Icon name="camera" /></span>}
-                <div className="grow"><b>{t("web.currentCover")}</b></div>
-                <button type="button" className="icon-btn file-chip__remove" aria-label={t("hr.fileRemove")} onClick={() => setDropCover(true)}><Icon name="x" className="icon icon--sm" /></button>
-              </div>
-            ) : (
-              <label className="file-pick">
-                <span className="btn btn--secondary btn--sm">{t("hr.fileChoose")}</span>
-                <span className="file-pick__name">{t("hr.fileNone")}</span>
-                <input type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={(e) => { const f = e.target.files?.[0] ?? null; e.currentTarget.value = ""; void chooseCover(f); }} />
-              </label>
-            )}
-            <small className="muted">{t("web.coverHint")}</small>
-            {errors.cover ? <span className="field-error">{t(errors.cover)}</span> : null}
+          {imageField("cover", t("prj.cover"), t("web.coverHint"))}
+          <div className="form-grid form-grid--2">
+            {imageField("photo1", t("prj.photo", { n: 1 }), t("prj.galleryHint"))}
+            {imageField("photo2", t("prj.photo", { n: 2 }), t("prj.galleryHint"))}
           </div>
         </>
       ) : null}
@@ -409,6 +406,63 @@ function ProjectForm({
         <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? t("web.saving") : t("set.save")}</button>
       </div>
     </form>
+  );
+}
+
+/** One website image of the project: a local preview before saving, the stored image, or a picker. */
+function ImageField({
+  label,
+  hint,
+  file,
+  keeps,
+  storedUrl,
+  error,
+  onChoose,
+  onRemoveNew,
+  onRemoveStored,
+}: {
+  label: string;
+  hint: string;
+  file: File | null;
+  keeps: boolean;
+  storedUrl: string;
+  error: string;
+  onChoose: (file: File | null) => void;
+  onRemoveNew: () => void;
+  onRemoveStored: () => void;
+}) {
+  const t = useTranslations();
+  const preview = useMemo(() => (file ? URL.createObjectURL(file) : ""), [file]);
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
+  return (
+    <div className={`field${error ? " field--invalid" : ""}`}>
+      <label>{label}</label>
+      {file ? (
+        <div className="file-chip">
+          {/* eslint-disable-next-line @next/next/no-img-element -- local preview */}
+          <img className="file-chip__thumb" src={preview} alt="" />
+          <div className="grow"><b>{file.name}</b></div>
+          <button type="button" className="icon-btn file-chip__remove" aria-label={t("hr.fileRemove")} onClick={onRemoveNew}><Icon name="x" className="icon icon--sm" /></button>
+        </div>
+      ) : keeps ? (
+        <div className="file-chip">
+          {/* eslint-disable-next-line @next/next/no-img-element -- signed preview */}
+          {storedUrl ? <img className="file-chip__thumb" src={storedUrl} alt="" /> : <span className="file-chip__thumb file-chip__thumb--icon"><Icon name="camera" /></span>}
+          <div className="grow"><b>{t("prj.currentImage")}</b></div>
+          <button type="button" className="icon-btn file-chip__remove" aria-label={t("hr.fileRemove")} onClick={onRemoveStored}><Icon name="x" className="icon icon--sm" /></button>
+        </div>
+      ) : (
+        <label className="file-pick">
+          <span className="btn btn--secondary btn--sm">{t("hr.fileChoose")}</span>
+          <span className="file-pick__name">{t("hr.fileNone")}</span>
+          <input type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={(e) => { const f = e.target.files?.[0] ?? null; e.currentTarget.value = ""; onChoose(f); }} />
+        </label>
+      )}
+      <small className="muted">{hint}</small>
+      {error ? <span className="field-error">{error}</span> : null}
+    </div>
   );
 }
 

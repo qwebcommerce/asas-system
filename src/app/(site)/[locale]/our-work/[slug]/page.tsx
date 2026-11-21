@@ -7,7 +7,7 @@ import { PillIcon } from "@/components/site/icons";
 import { ProjectCard, ProjectImage } from "@/components/site/project-card";
 import { SiteEffects } from "@/components/site/site-effects";
 import { SiteFooter } from "@/components/site/site-footer";
-import { SiteHeader } from "@/components/site/site-header";
+import { consultationHref, SiteHeader } from "@/components/site/site-header";
 import { routing, type Locale } from "@/i18n/routing";
 import { projectSlugs, siteProjects } from "@/server/site-content";
 
@@ -26,11 +26,18 @@ async function load(locale: string, slug: string) {
   const index = projects.findIndex((project) => project.slug === slug);
   if (index < 0) return null;
   const project = projects[index];
+  const numbered = projects.map((item, i) => ({ ...item, index: i }));
   const more = [
-    ...projects.filter((item, i) => i !== index && item.kind === project.kind),
-    ...projects.filter((item, i) => i !== index && item.kind !== project.kind),
+    ...numbered.filter((item) => item.index !== index && item.kind === project.kind),
+    ...numbered.filter((item) => item.index !== index && item.kind !== project.kind),
   ].slice(0, 2);
   return { project, more, t };
+}
+
+/** "Disciplines · Location · Year" (published projects' meta line is already "Location · Year"). */
+function heroMeta(project: { meta: string; location: string; year: string }) {
+  const placeAndYear = [project.location, project.year].filter(Boolean).join(" · ");
+  return project.meta === placeAndYear ? placeAndYear : [project.meta, placeAndYear].filter(Boolean).join("  ·  ");
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -69,7 +76,7 @@ export default async function ProjectPage({ params }: Params) {
               <span>{project.scope}</span>
             </nav>
             <h1 className="display">{project.name}</h1>
-            <p className="post-hero__meta">{[project.location, project.year].filter(Boolean).join("  ·  ")}</p>
+            <p className="post-hero__meta">{heroMeta(project)}</p>
           </div>
         </section>
 
@@ -79,6 +86,15 @@ export default async function ProjectPage({ params }: Params) {
           </div>
           <figcaption className="post-cover__note">{project.coverAlt}</figcaption>
         </figure>
+        {project.thumbs.length > 0 ? (
+          <div className="post-gallery">
+            {project.thumbs.map((thumb, i) => (
+              <span className={`photo kb${i ? " kb--alt" : ""}`} key={i}>
+                <ProjectImage cover={thumb} alt={project.name} sizes="(max-width: 720px) 50vw, 640px" />
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         <section className="post-body">
           <aside className="post-aside">
@@ -107,8 +123,8 @@ export default async function ProjectPage({ params }: Params) {
                   <PillIcon />
                 </Link>
               </div>
-              <div className="work-grid">
-                {more.map((item, i) => <ProjectCard key={item.slug} project={item} locale={locale} index={i} />)}
+              <div className="projects">
+                {more.map((item) => <ProjectCard key={item.slug} project={item} locale={locale} index={item.index} />)}
               </div>
             </div>
           </section>
@@ -120,7 +136,7 @@ export default async function ProjectPage({ params }: Params) {
               <h2 className="display">{t("work.ctaTitle")}</h2>
               <p>{t("work.ctaText")}</p>
             </div>
-            <Link className="pill pill--light" href={sitePath(locale, "", "contact")}>
+            <Link className="pill pill--light" href={consultationHref(locale)}>
               {t("book")}
               <PillIcon />
             </Link>

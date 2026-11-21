@@ -1061,7 +1061,13 @@
       "docsTitle": "ASAS Resource Room — Documents",
       "docsDesc": "Get to know our company, explore our services and prepare for your first conversation with ASAS.",
       "workTitle": "ASAS Projects — Our work",
-      "workDesc": "Homes and commercial spaces designed, built and finished by ASAS Executive Contracting in Qatar."
+      "workDesc": "Homes and commercial spaces designed, built and finished by ASAS Executive Contracting in Qatar.",
+      "aboutTitle": "About ASAS — More than ten years of building in Qatar",
+      "aboutDesc": "Asas Executive Contracting delivers plans, construction, interiors, finishing and furniture for homes and businesses across Qatar.",
+      "servicesTitle": "ASAS Services — Five disciplines, one coordinated team",
+      "servicesDesc": "Architectural plans, construction, interior design, finishing and furniture, carried through every stage by one ASAS team.",
+      "contactTitle": "Contact ASAS — Lusail, Qatar",
+      "contactDesc": "Call, message or visit our Lusail office. We reply within one working day."
     },
     "nav": {
       "main": "Main",
@@ -1087,13 +1093,13 @@
     "phone": "+974 6611 1817",
     "book": "Book a consultation",
     "hero": {
-      "eyebrow": "ASAS Executive Contracting · Since 2015",
+      "eyebrow": "ASAS Executive Contracting · Lusail, Qatar",
       "line1": "From the first plan",
       "line2": "to the <b>final finish,</b>",
       "line3": "built in Qatar.",
       "alt": "من المخطط الأول حتى اللمسة الأخيرة",
       "sub": "Architectural plans, construction, interior design, finishing and furniture. One Qatari team for your home or business.",
-      "imgAlt": "ASAS villa concept with arched windows and palm trees",
+      "imgAlt": "ASAS villa design with arched windows and palm trees",
       "stats": [
         [
           "10+",
@@ -1104,8 +1110,8 @@
           "disciplines under one roof"
         ],
         [
-          "2015",
-          "founded in Lusail, Qatar"
+          "1",
+          "team from plans to keys"
         ]
       ],
       "formTitle": "LET’S START WITH YOUR VISION",
@@ -1187,14 +1193,15 @@
           "Furniture",
           "Elegant, comfortable and durable pieces for every taste."
         ]
-      ]
+      ],
+      "explore": "Explore services"
     },
     "work": {
       "eyebrow": "Featured projects",
       "eyebrowAlt": "مشاريع مميزة",
       "title": "Selected work<br></br>across Qatar",
       "noteTitle": "Homes and commercial spaces",
-      "note": "Designed, built and finished by the ASAS team since 2015.",
+      "note": "Designed, built and finished by the ASAS team.",
       "all": "View all projects",
       "disclosure": "Visual direction illustrated with concept imagery.",
       "kinds": {
@@ -1204,26 +1211,38 @@
         "construction": "Construction"
       },
       "pageLabel": "Our work  /  Projects",
-      "pageTitle": "Built with<br></br>precision.",
-      "pageIntro": "A selection of homes and spaces we have designed, built and finished across Qatar.",
-      "collection": "Selected projects.",
+      "pageIntro": "Villas, homes and interiors designed, built and finished by the ASAS team.",
+      "collection": "{count, plural, one {One project} =2 {Two projects} =3 {Three projects} =4 {Four projects} =5 {Five projects} =6 {Six projects} =7 {Seven projects} =8 {Eight projects} =9 {Nine projects} =10 {Ten projects} other {# projects}}, one standard.",
       "filterLabel": "Filter projects",
       "allProjects": "All projects",
-      "ctaTitle": "Planning a project?",
-      "ctaText": "Tell us about your plot or space and we will take it from there.",
+      "ctaTitle": "Have a project in mind?",
+      "ctaText": "Share your plot, home or space and we’ll show you how ASAS can help.",
       "breadcrumb": "Projects",
       "factType": "Type",
       "factLocation": "Location",
       "factYear": "Year",
       "back": "All projects",
       "more": "More projects",
-      "closing": "From the first plan to the final finish, the ASAS team coordinated design, construction and finishing as one, so every detail arrived as drawn."
+      "closing": "From the first plan to the final finish, the ASAS team coordinated design, construction and finishing as one, so every detail arrived as drawn.",
+      "pageLines": [
+        "Selected work",
+        "across Qatar."
+      ],
+      "pageAlt": "مشاريع مميزة",
+      "heroAlt": "Villa with pointed arches",
+      "pageNote": "{projects, plural, one {# PROJECT} other {# PROJECTS}}  /  5 DISCIPLINES",
+      "filters": {
+        "construction": "Construction",
+        "architecture": "Architecture",
+        "interior": "Interiors",
+        "fitout": "Finishing"
+      }
     },
     "about": {
       "eyebrow": "About ASAS",
       "eyebrowAlt": "من نحن",
       "title": "A Qatari company<br></br><b>built on precision.</b>",
-      "lead": "For more than ten years Asas Executive Contracting LLC has delivered engineering, construction and interior projects with passion and professionalism, holding to safety, quality and on-time delivery.",
+      "lead": "For more than ten years Asas Executive Contracting has delivered engineering, construction and interior projects with passion and professionalism, holding to safety, quality and on-time delivery.",
       "imgAlts": [
         "Dining room interior",
         "Villa facade with columns",
@@ -1236,7 +1255,8 @@
       "visionText": "To be a leading company in finishing, contracting, construction and interior design.",
       "mission": "Our mission",
       "missionAlt": "مهمتنا",
-      "missionText": "Distinguished service that puts client satisfaction, safety, schedules and budgets first."
+      "missionText": "Distinguished service that puts client satisfaction, safety, schedules and budgets first.",
+      "more": "More about ASAS"
     },
     "why": {
       "title": "Why clients <b>choose ASAS</b>",
@@ -1310,23 +1330,16 @@
       "navigate": "NAVIGATE",
       "services": "SERVICES",
       "visit": "VISIT",
-      "serviceList": [
-        "Architectural plans",
-        "Construction",
-        "Interior design",
-        "Finishing",
-        "Furniture"
-      ],
       "address1": "6th floor, Rafal Tower",
       "address2": "Lusail, Qatar",
       "hours": "Sun – Thu · 9–12 / 1–5",
-      "copyright": "© {year} Asas Executive Contracting LLC"
+      "copyright": "© {year} Asas Executive Contracting W.L.L.",
+      "companyAlt": "شركة أساس التنفيذية للمقاولات ذ.م.م"
     },
     "blogs": {
       "label": "ASAS journal  /  Blogs",
-      "title": "Spaces,<br></br>considered.",
       "intro": "Ideas, materials and practical thinking for the places we call our own.",
-      "heroAlt": "Marble vanity with lit display niches",
+      "heroAlt": "Marble vanity with lit niches",
       "heroNote": "01  /  A CLOSER LOOK AT CRAFT",
       "read": "Read the story",
       "collection": "Notes from the studio.",
@@ -1344,13 +1357,17 @@
       "ctaTitle": "An idea worth building?",
       "ctaText": "Let’s turn the inspiration into a plan for your space.",
       "editorsPick": "Editor’s pick",
-      "insights": "ASAS INSIGHTS"
+      "insights": "ASAS INSIGHTS",
+      "lines": [
+        "Spaces,",
+        "considered."
+      ],
+      "alt": "أفكار عن المساحات والمواد"
     },
     "docs": {
       "label": "ASAS resource room  /  Documents",
-      "title": "Everything starts<br></br>with clarity.",
       "intro": "Get to know our company, explore our services and prepare for your first conversation with ASAS.",
-      "note": "REQUEST THE LATEST COPIES FROM OUR TEAM",
+      "note": "Request the latest copies from our team",
       "coverEyebrow": "ASAS  /  QATAR",
       "coverTitle": "Built on<br></br>precision.",
       "coverFoot": "Executive contracting<br></br>Company profile",
@@ -1375,7 +1392,12 @@
       "requestDocsSubject": "Document request",
       "download": "Download PDF  ↓",
       "downloadLabel": "Download {title} ({size})",
-      "pdfMeta": "PDF  /  {size}"
+      "pdfMeta": "PDF  /  {size}",
+      "lines": [
+        "Everything starts",
+        "with clarity."
+      ],
+      "alt": "كل شيء يبدأ بالوضوح"
     },
     "post": {
       "back": "All stories",
@@ -1390,6 +1412,232 @@
       "moreAll": "Explore all blogs",
       "breadcrumb": "Blogs",
       "minutes": "{n} min"
+    },
+    "pages": {
+      "label": "Pages",
+      "next": "Next page",
+      "previous": "Previous page"
+    },
+    "aboutPage": {
+      "label": "About ASAS  /  Lusail, Qatar",
+      "lines": [
+        "More than ten years",
+        "of building in Qatar."
+      ],
+      "alt": "شركة أساس التنفيذية للمقاولات",
+      "intro": "For more than ten years, Asas Executive Contracting has delivered plans, construction, interiors, finishing and furniture for homes and businesses across Qatar.",
+      "heroAlt": "Stone villa facade at dusk",
+      "note": "6TH FLOOR, RAFAL TOWER  /  LUSAIL",
+      "whoLabel": "Who we are",
+      "whoAlt": "من نحن",
+      "statement": "A Qatari company established over ten years ago, working with <b>passion and professionalism</b> to deliver the best engineering solutions — from the first plan to the final finish.",
+      "captionTitle": "Asas Executive Contracting W.L.L.",
+      "captionText": "6th floor, Rafal Tower, Lusail, Qatar",
+      "panoAlt": "Villa with pointed arches",
+      "numbers": [
+        [
+          "10+",
+          "Years building in Qatar"
+        ],
+        [
+          "5",
+          "Disciplines under one roof"
+        ],
+        [
+          "1",
+          "Coordinated team, one point of contact"
+        ]
+      ],
+      "drivesAlt": "Classical stone columns",
+      "drivesLabel": "What drives us",
+      "drivesTitle": "Vision, mission<br></br>and goal.",
+      "drives": [
+        [
+          "Our vision",
+          "رؤيتنا",
+          "To be a leading company in finishing, contracting, construction and interior design, with innovative and sustainable solutions."
+        ],
+        [
+          "Our mission",
+          "مهمتنا",
+          "To deliver distinguished service that puts client satisfaction first, within safe environments, schedules and budgets."
+        ],
+        [
+          "Our goal",
+          "هدفنا",
+          "To create comfortable, efficient spaces that improve the lives of individuals and businesses."
+        ]
+      ],
+      "valuesLabel": "Our values",
+      "valuesTitle": "Five values behind<br></br>every project.",
+      "valuesText": "Each discipline is guided by one value. Together they describe how ASAS works, from the first sketch to the final handover.",
+      "values": [
+        [
+          "Accuracy",
+          "الدقة",
+          "Precise plans and measurements, checked at every stage."
+        ],
+        [
+          "Power",
+          "القوة",
+          "Durable structures built with modern techniques."
+        ],
+        [
+          "Creativity",
+          "الإبداع",
+          "Original ideas shaped around each client’s vision."
+        ],
+        [
+          "Detail",
+          "التفاصيل",
+          "Care for every joint, edge and finish."
+        ],
+        [
+          "Elegance",
+          "الأناقة",
+          "Calm, refined spaces that stay timeless."
+        ]
+      ],
+      "trackLabel": "How we work",
+      "trackTitle": "One line runs through<br></br>every project.",
+      "trackText": "One team, one point of contact, clear scope and clear costs — from your first meeting to move-in day.",
+      "track": [
+        [
+          "Meet",
+          "At our Lusail office or on site, to understand your needs, budget and timeline."
+        ],
+        [
+          "Design",
+          "Architectural plans and interior concepts, with a clear scope for your approval."
+        ],
+        [
+          "Build",
+          "Site teams build to schedule under high safety standards, with regular updates."
+        ],
+        [
+          "Finish",
+          "Floors, walls, ceilings and lighting finished in premium materials."
+        ],
+        [
+          "Hand over",
+          "Furniture installed, a final inspection together, keys in your hand."
+        ]
+      ],
+      "commits": [
+        [
+          "Safety first on every site",
+          "Trained crews and high site-safety standards on every job, from the first excavation to the final coat.",
+          "Finished stone entrance"
+        ],
+        [
+          "Quality you can see",
+          "Premium materials and careful finishing, inspected together with you before handover.",
+          "Marble entrance hall"
+        ]
+      ],
+      "ctaTitle": "Let’s build something lasting.",
+      "ctaText": "Tell us about your plot, home or space. We reply within one working day."
+    },
+    "servicesPage": {
+      "label": "Our services  /  Five disciplines",
+      "lines": [
+        "Five disciplines.",
+        "One coordinated team."
+      ],
+      "alt": "خمس تخصصات، فريق واحد",
+      "intro": "From architectural plans to the last piece of furniture, ASAS carries your project through every stage — or joins exactly where you need us.",
+      "heroAlt": "White modern classic villa",
+      "note": "PLANS → KEYS  /  ONE TEAM",
+      "indexLabel": "Services",
+      "names": {
+        "plans": "Architectural plans",
+        "construction": "Construction",
+        "interior": "Interior design",
+        "finishing": "Finishing",
+        "furniture": "Furniture"
+      },
+      "rows": {
+        "plans": {
+          "kicker": "01 · ACCURACY",
+          "alt": "الدقة",
+          "body": "Precise plans that make the most of your plot and meet international engineering standards.",
+          "points": [
+            "Concept and layout planning",
+            "3D exterior and interior visualisation",
+            "Detailed engineering drawings"
+          ],
+          "cta": "Discuss your plans"
+        },
+        "construction": {
+          "kicker": "02 · POWER",
+          "alt": "القوة",
+          "body": "Durable structures built by our own site teams with modern techniques and high-quality materials.",
+          "points": [
+            "Villas, homes and commercial buildings",
+            "Structural and civil works",
+            "Site safety and schedule management"
+          ],
+          "cta": "Plan your build"
+        },
+        "interior": {
+          "kicker": "03 · CREATIVITY",
+          "alt": "الإبداع",
+          "body": "Original interiors shaped around the way you live, from the first mood board to the final styling.",
+          "points": [
+            "Space planning and concepts",
+            "Lighting, ceilings and joinery design",
+            "Material and colour selection"
+          ],
+          "cta": "Start your interior"
+        },
+        "finishing": {
+          "kicker": "04 · DETAIL",
+          "alt": "التفاصيل",
+          "body": "Luxurious finishes in stone, wood and marble, installed with care for every detail.",
+          "points": [
+            "Marble, stone and tiling",
+            "Gypsum ceilings and wall panelling",
+            "Bathrooms, kitchens and joinery"
+          ],
+          "cta": "Talk about finishes"
+        },
+        "furniture": {
+          "kicker": "05 · ELEGANCE",
+          "alt": "الأناقة",
+          "body": "Elegant, comfortable and durable pieces chosen or made to fit your space.",
+          "points": [
+            "Custom and bespoke pieces",
+            "Sourcing from trusted suppliers",
+            "Delivery, installation and styling"
+          ],
+          "cta": "Furnish your space"
+        }
+      },
+      "ctaTitle": "Not sure where to start?",
+      "ctaText": "Book a consultation and we’ll recommend the right services for your project."
+    },
+    "contactPage": {
+      "label": "Contact  /  Lusail, Qatar",
+      "lines": [
+        "Let’s start",
+        "with your vision."
+      ],
+      "alt": "دعنا نساعد حلمك يصبح حقيقة",
+      "intro": "Call, message or visit our Lusail office. We reply within one working day.",
+      "heroAlt": "Classic white villa",
+      "note": "SUN – THU  /  9:00–12:00 · 13:00–17:00",
+      "call": "CALL US",
+      "whatsapp": "WHATSAPP",
+      "whatsappText": "Send photos or quick questions",
+      "email": "EMAIL",
+      "emailText": "Quotes, documents and enquiries",
+      "visit": "VISIT",
+      "findLabel": "Visit our office",
+      "findTitle": "Find us<br></br>in Lusail.",
+      "addressAlt": "الدور السادس برج رافال، لوسيل، قطر",
+      "hours": "Sunday – Thursday<br></br>9:00–12:00 · 13:00–17:00",
+      "openMaps": "Open in Google Maps",
+      "mapTitle": "Map: Rafal Tower, Lusail"
     }
   },
   "web": {
@@ -1521,7 +1769,7 @@
     "address": "Client address",
     "notes": "Notes",
     "publish": "Show this project on the website",
-    "publishHint": "Only the project name, type, location, summary and cover image are shown publicly. Client details, budget and notes stay private.",
+    "publishHint": "Only the project name, type, location, summary, cover image and gallery photos are shown publicly. Client details, budget and notes stay private.",
     "summary": "Public summary",
     "cover": "Cover image",
     "required": "Required.",
@@ -1569,7 +1817,10 @@
     "noModuleAccess": "You do not have access to this section.",
     "deleteQ": "Delete this project?",
     "deleteNote": "The project is removed from the system and the website. Projects that still have linked records cannot be deleted.",
-    "missingProject": "The selected project no longer exists."
+    "missingProject": "The selected project no longer exists.",
+    "photo": "Gallery photo {n}",
+    "galleryHint": "Optional. Shown under the cover on the website. JPG, PNG or WebP, up to 2 MB.",
+    "currentImage": "Current image"
   },
   "rcpt": {
     "open": "Receipt",

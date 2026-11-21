@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cacheLife } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import type { Locale } from "@/i18n/routing";
-import { mailto, otherLocale, SITE_EMAIL, SITE_PHONE_HREF, sitePath } from "./content";
+import { DISCIPLINES, mailto, otherLocale, SITE_EMAIL, SITE_PHONE_HREF, sitePath } from "./content";
 import { Logo } from "./photo";
 import { PAGE_PATH, type SitePage } from "./site-header";
 
@@ -15,7 +15,7 @@ async function currentYear() {
 export async function SiteFooter({ locale, current, path }: { locale: Locale; current: SitePage; path?: string }) {
   const t = await getTranslations({ locale, namespace: "site" });
   const year = await currentYear();
-  const home = (hash: string) => sitePath(locale, "", hash);
+  const page = (key: SitePage, hash = "") => sitePath(locale, PAGE_PATH[key], hash);
   const other = otherLocale(locale);
 
   return (
@@ -35,14 +35,14 @@ export async function SiteFooter({ locale, current, path }: { locale: Locale; cu
           <div>
             <h4>{t("footer.navigate")}</h4>
             <ul>
-              <li><Link href={sitePath(locale)}>{t("nav.home")}</Link></li>
-              <li><Link href={home("services")}>{t("nav.services")}</Link></li>
-              <li><Link href={sitePath(locale, "/our-work")}>{t("nav.work")}</Link></li>
-              <li><Link href={home("about")}>{t("nav.about")}</Link></li>
-              <li><Link href={home("contact")}>{t("nav.contact")}</Link></li>
+              <li><Link href={page("home")}>{t("nav.home")}</Link></li>
+              <li><Link href={page("about")}>{t("nav.about")}</Link></li>
+              <li><Link href={page("services")}>{t("nav.services")}</Link></li>
+              <li><Link href={page("work")}>{t("nav.work")}</Link></li>
+              <li><Link href={page("contact")}>{t("nav.contact")}</Link></li>
               <li>
-                <Link href={sitePath(locale, "/blogs")}>{t("nav.blogs")}</Link> &nbsp;·&nbsp;{" "}
-                <Link href={sitePath(locale, "/resources")}>{t("nav.documents")}</Link>
+                <Link href={page("blogs")}>{t("nav.blogs")}</Link> &nbsp;·&nbsp;{" "}
+                <Link href={page("documents")}>{t("nav.documents")}</Link>
               </li>
               <li><a href={sitePath(locale, "/sign-in")}>{t("nav.signIn")}</a></li>
             </ul>
@@ -50,8 +50,8 @@ export async function SiteFooter({ locale, current, path }: { locale: Locale; cu
           <div>
             <h4>{t("footer.services")}</h4>
             <ul>
-              {(t.raw("footer.serviceList") as string[]).map((item) => (
-                <li key={item}>{item}</li>
+              {DISCIPLINES.map((key) => (
+                <li key={key}><Link href={page("services", key)}>{t(`servicesPage.names.${key}`)}</Link></li>
               ))}
             </ul>
           </div>
@@ -66,7 +66,9 @@ export async function SiteFooter({ locale, current, path }: { locale: Locale; cu
           </div>
         </div>
         <div className="footer__bottom">
-          <span>{t("footer.copyright", { year })}</span>
+          <span>
+            {t("footer.copyright", { year })} &nbsp;·&nbsp; <span className="alt" lang={other}>{t("footer.companyAlt")}</span>
+          </span>
           <span>
             {t("lang.current")} ·{" "}
             <a className="alt" href={sitePath(other, path ?? PAGE_PATH[current])} lang={other} hrefLang={other}>{t("lang.other")}</a>

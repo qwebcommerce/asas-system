@@ -28,7 +28,7 @@ export function PostCard({
   categoryLabel,
   minutesLabel,
   className = "article reveal",
-  photoClass = "article__photo",
+  photoClass = "photo kb article__photo",
 }: {
   post: PostView;
   locale: string;
@@ -39,9 +39,9 @@ export function PostCard({
 }) {
   return (
     <Link className={className} href={sitePath(locale as "en" | "ar", `/blogs/${post.slug}`)} data-cat={post.category}>
-      <div className={photoClass}>
+      <span className={photoClass}>
         <PostImage cover={post.cover} alt={post.coverAlt} sizes="(max-width: 1024px) 100vw, 33vw" />
-      </div>
+      </span>
       <p className="label">{categoryLabel}</p>
       <h3>{post.title}</h3>
       <p className="article__time">{minutesLabel}</p>

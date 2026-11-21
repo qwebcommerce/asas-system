@@ -48,10 +48,20 @@ export type Project = {
   summaryAr: string;
   hasCover: boolean;
   coverType: string;
+  /** Whether each of the two gallery photos (shown under the cover on the website) is set */
+  gallery: [boolean, boolean];
   createdBy: string;
 };
 
-export type ProjectInput = Omit<Project, "id" | "code" | "slug" | "hasCover" | "coverType" | "createdBy">;
+export type ProjectInput = Omit<Project, "id" | "code" | "slug" | "hasCover" | "coverType" | "gallery" | "createdBy">;
+
+/** Images of a project on the website: the cover and two gallery photos. Stored as `<slot>Path` / `<slot>Type`. */
+export const projectImageSlots = ["cover", "photo1", "photo2"] as const;
+export type ProjectImageSlot = (typeof projectImageSlots)[number];
+
+export function isProjectImageSlot(value: unknown): value is ProjectImageSlot {
+  return projectImageSlots.some((slot) => slot === value);
+}
 
 function text(value: unknown) {
   return typeof value === "string" ? value : "";
@@ -92,6 +102,7 @@ export function mapProject(id: string, data: Record<string, unknown>): Project |
     summaryAr: text(data.summaryAr),
     hasCover: text(data.coverPath).length > 0,
     coverType: text(data.coverType),
+    gallery: [text(data.photo1Path).length > 0, text(data.photo2Path).length > 0],
     createdBy: text(data.createdBy),
   };
 }

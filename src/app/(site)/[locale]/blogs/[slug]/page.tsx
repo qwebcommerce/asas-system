@@ -7,7 +7,7 @@ import { PillIcon } from "@/components/site/icons";
 import { PostCard, PostImage, formatDate } from "@/components/site/post-card";
 import { SiteEffects } from "@/components/site/site-effects";
 import { SiteFooter } from "@/components/site/site-footer";
-import { SiteHeader } from "@/components/site/site-header";
+import { consultationHref, SiteHeader } from "@/components/site/site-header";
 import { routing, type Locale } from "@/i18n/routing";
 import { bodyBlocks } from "@/lib/website";
 import { postSlugs, sitePost } from "@/server/site-content";
@@ -146,7 +146,7 @@ export default async function BlogPostPage({ params }: Params) {
               <h2 className="display">{t("blogs.ctaTitle")}</h2>
               <p>{t("blogs.ctaText")}</p>
             </div>
-            <Link className="pill pill--light" href={sitePath(locale, "", "contact")}>
+            <Link className="pill pill--light" href={consultationHref(locale)}>
               {t("book")}
               <PillIcon />
             </Link>
