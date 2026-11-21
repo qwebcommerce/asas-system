@@ -39,8 +39,18 @@ const SOLID = [
   "M 106.71 190.94 L 109.51 195.86 L 109.51 190.94 L 110.49 190.94 L 110.49 197.43 L 109.35 197.43 L 106.55 192.51 L 106.55 197.43 L 105.57 197.43 L 105.57 190.94 Z M 106.71 190.94 "
 ];
 
-export function AsasLogo({ className, title }: { className?: string; title?: string }) {
+/** `mark`: the logo without the faded lines above it, as on the receipt voucher. */
+export function AsasLogo({ className, title, mark = false }: { className?: string; title?: string; mark?: boolean }) {
   const fade = useId();
+  if (mark) {
+    return (
+      <svg className={className} viewBox="27.6 52.5 82.95 145.7" preserveAspectRatio="none" role={title ? "img" : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+        <g fill="currentColor">
+          {SOLID.map((d) => <path key={d} d={d} />)}
+        </g>
+      </svg>
+    );
+  }
   return (
     <svg
       className={className}

@@ -189,7 +189,10 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
                 locale === "ar" ? receipt.payerAr || receipt.payerEn : receipt.payerEn || receipt.payerAr,
                 t(`fin.method.${receipt.method}`),
                 <bdi key="a" className="num">{formatQar(receipt.amount, locale)}</bdi>,
-                accounting.canManage ? <button key="e" type="button" className="btn btn--secondary btn--sm" onClick={() => setRecord({ book: "receipts", id: receipt.id })}>{t("us.edit")}</button> : null,
+                <div key="e" className="hstack" style={{ justifyContent: "flex-end" }}>
+                  <Link className="btn btn--secondary btn--sm" href={`/accounting/receipts/${receipt.id}`}>{t("rcpt.open")}</Link>
+                  {accounting.canManage ? <button type="button" className="btn btn--ghost btn--sm" onClick={() => setRecord({ book: "receipts", id: receipt.id })}>{t("us.edit")}</button> : null}
+                </div>,
               ])}
             />
           </Section>

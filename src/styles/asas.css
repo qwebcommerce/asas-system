@@ -913,3 +913,124 @@ img, svg { display: block; max-width: 100%; }
 .prj-filters .search { flex: 1 1 280px; }
 .prj-form__section { margin: 8px 0 -4px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); border-top: 1px solid var(--border); padding-top: 14px; }
 .prj-form__section:first-of-type { border-top: 0; padding-top: 0; }
+
+/* =========================================================
+   Receipt voucher (cash / cheque), laid out in points to match
+   "Asas-receipt.pdf": 842 x 595 pt, landscape.
+   ========================================================= */
+.rv {
+  --ink: #1c1c1b;
+  --soft: #5f5f5f;
+  --dots: #9b9b9b;
+  position: relative;
+  width: 842pt;
+  height: 595pt;
+  flex: none;
+  overflow: hidden;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-source-sans), "Source Sans 3", system-ui, sans-serif;
+  font-size: 11pt;
+  line-height: 1.2;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 12px 32px rgba(0, 0, 0, .08);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rv :where(h2, p, b, small) { margin: 0; font-weight: inherit; }
+.rv [lang="ar"] { font-family: var(--font-noto-arabic), "Noto Sans Arabic", var(--font-ibm-arabic), sans-serif; }
+.rv b { font-weight: 600; }
+.rv bdi { unicode-bidi: isolate; }
+
+.rv-stripes { position: absolute; top: 0; left: 0; height: 555pt; }
+.rv-stripes i { position: absolute; top: 0; bottom: 0; width: .7pt; background: #d6d6d6; }
+.rv-stripes i:nth-child(1) { left: 14.6pt; background: #e2e2e2; }
+.rv-stripes i:nth-child(2) { left: 19.3pt; background: #dcdcdc; }
+.rv-stripes i:nth-child(3) { left: 24pt; }
+.rv-stripes i:nth-child(4) { left: 28.7pt; background: #d0d0d0; }
+.rv-stripes i:nth-child(5) { left: 34pt; background: #cacaca; }
+
+.rv-logo { position: absolute; left: 56pt; top: 27.3pt; width: 36.7pt; height: 60pt; color: #1c1c1b; }
+.rv-company { position: absolute; left: 108pt; top: 31.6pt; display: flex; flex-direction: column; }
+.rv-company b { font-size: 20pt; font-weight: 600; letter-spacing: 0; line-height: 1; white-space: nowrap; }
+.rv-company small { margin-top: 8.4pt; font-size: 8.6pt; font-weight: 600; letter-spacing: .43em; color: #6a6a6a; line-height: 1; }
+.rv-company--ar { left: auto; right: 41pt; top: 29.4pt; align-items: flex-start; text-align: right; }
+.rv-company--ar b { font-size: 16pt; font-weight: 400; letter-spacing: 0; line-height: 1.3; }
+.rv-company--ar small { margin-top: 13.4pt; font-size: 10.7pt; font-weight: 400; letter-spacing: 0; color: #6a6a6a; }
+.rv-rule { position: absolute; left: 56.3pt; right: 40.2pt; top: 102.4pt; height: 2pt; margin: 0; border: 0; background: linear-gradient(90deg, #1c1c1b 0%, #b9b9b9 55%, #1c1c1b 100%); }
+
+.rv-title { position: absolute; left: 56pt; right: 41pt; top: 118pt; text-align: center; }
+.rv-title h2 { font-size: 17pt; font-weight: 400; line-height: 1.5; color: var(--ink); }
+.rv-title p { margin-top: 4pt; font-size: 10.4pt; font-weight: 600; letter-spacing: .325em; line-height: 1.2; padding-left: .325em; }
+
+.rv-top { position: absolute; inset: 0; pointer-events: none; }
+.rv-pair { position: absolute; top: 179pt; display: flex; flex-direction: column; gap: 3pt; line-height: 1.2; }
+.rv-pair span { font-size: 10.4pt; color: var(--soft); }
+.rv-pair b { font-size: 12pt; }
+.rv-pair--no { left: 56pt; }
+.rv-pair--amount { left: 261.8pt; }
+.rv-box { position: absolute; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+.rv-box--no { left: 83.8pt; top: 186.5pt; width: 119.8pt; height: 32.8pt; border: 1pt solid #c4c4c4; border-radius: 7pt; font-size: 11pt; }
+.rv-amount { position: absolute; left: 318pt; top: 166pt; width: 229pt; height: 58pt; }
+.rv-amount__unit { position: absolute; top: 1pt; font-size: 7.6pt; font-weight: 600; color: #555; white-space: nowrap; }
+.rv-amount__unit--qr { left: 8pt; }
+.rv-amount__unit--dh { left: 167.6pt; }
+.rv-box--amount { left: 0; top: 16.6pt; width: 229pt; height: 40.6pt; border: 1.3pt solid #1c1c1b; border-radius: 9pt; background: #f0f0f0; display: grid; grid-template-columns: 160.4pt 1fr; font-size: 15pt; }
+.rv-box--amount span { display: flex; align-items: center; justify-content: center; height: 100%; }
+.rv-box--amount span + span { border-left: 1.1pt solid #1c1c1b; font-size: 12pt; }
+.rv-date { position: absolute; left: 600pt; right: 41pt; top: 192pt; display: flex; align-items: flex-end; }
+.rv-date b { font-size: 12pt; }
+.rv-date__value { flex: 0 0 124.5pt; margin: 0 auto 2pt 10.5pt; padding-bottom: 1pt; height: 14pt; border-bottom: 1pt dotted var(--dots); text-align: center; font-weight: 600; font-size: 11pt; }
+.rv-date .rv-ar { font-size: 10.4pt; color: var(--soft); position: relative; top: -2pt; }
+
+.rv-lines { position: absolute; left: 56pt; right: 41pt; top: 228.5pt; display: grid; grid-template-rows: repeat(5, 31.1pt) 30.2pt; }
+.rv-line { display: flex; align-items: flex-end; min-width: 0; }
+.rv-line__label { flex: none; position: relative; top: 2pt; font-size: 11.5pt; padding-bottom: 1.5pt; white-space: nowrap; }
+.rv-line__label.rv-ar { font-size: 10.75pt; color: var(--soft); top: 1.5pt; }
+.rv-line__value { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; column-gap: 14pt; margin: 0 7.5pt; padding: 0 2pt 1.5pt; border-bottom: 1pt dotted var(--dots); font-weight: 600; font-size: 11pt; line-height: 1.25; min-height: 14pt; }
+.rv-line__value--small { font-size: 9.2pt; }
+.rv-line:last-child .rv-line__value { margin: 0; }
+.rv-line__value .rv-ar { margin-left: auto; text-align: right; }
+
+.rv-methods { position: absolute; left: 56pt; top: 437pt; height: 16pt; right: 41pt; }
+.rv-methods > div { position: absolute; top: 0; display: flex; align-items: center; height: 16pt; white-space: nowrap; }
+.rv-methods__label { left: 0; gap: 13pt; }
+.rv-methods__label b { font-size: 11pt; }
+.rv-methods [lang="ar"] { font-size: 10.4pt; color: var(--soft); }
+.rv-check { gap: 8.5pt; }
+.rv-check span:not([lang]) { font-size: 11pt; margin-right: 3.5pt; }
+.rv-check--cash { left: 204.5pt; }
+.rv-check--cheque { left: 353.7pt; }
+.rv-check--transfer { left: 504pt; }
+.rv-check i { width: 11.8pt; height: 11.8pt; border: 1.2pt solid #1c1c1b; border-radius: 2.6pt; display: grid; place-items: center; box-sizing: border-box; }
+.rv-check i.is-on { background: #1c1c1b; }
+.rv-check svg { width: 9pt; height: 9pt; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.rv-signs { position: absolute; left: 0; right: 0; top: 473.6pt; }
+.rv-signs > div { position: absolute; top: 0; width: 180.6pt; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); }
+.rv-signs > div:nth-child(1) { left: 171.5pt; }
+.rv-signs > div:nth-child(2) { left: 428.7pt; }
+.rv-signs > div:nth-child(3) { left: 685.3pt; }
+.rv-signs span { font-size: 10.4pt; color: var(--soft); line-height: 1.5; }
+.rv-signs b { margin-top: 3pt; font-size: 11pt; }
+.rv-signs i { display: block; align-self: stretch; margin-top: 23.5pt; border-bottom: 1pt dotted var(--dots); }
+
+.rv-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 40pt; display: flex; align-items: center; justify-content: center; background: #1c1c1b; color: #d9d9d9; font-size: 9.26pt; white-space: nowrap; }
+.rv-foot em { font-style: normal; margin: 0 6.6pt; color: #a8a8a8; }
+
+.rv-wrap { overflow-x: auto; padding: 8px 0 24px; width: 100%; }
+.rv-fit { zoom: var(--rv-zoom, 1); width: max-content; margin: 0 auto; }
+.rv-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rv-share { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rv-share .input { min-width: 0; flex: 1 1 320px; font-size: 13px; }
+.rv-public { min-height: 100vh; background: #ececea; padding: 24px 16px 40px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.rv-public .rv-wrap { max-width: 1123px; }
+
+/* Print the voucher on one landscape A4 page, like the reference */
+@page rv-page { size: A4 landscape; margin: 0; }
+@media print {
+  .rv { page: rv-page; box-shadow: none; margin: 0; break-after: avoid; }
+  .rv-wrap { overflow: visible; padding: 0; }
+  .rv-fit { zoom: 1; margin: 0; }
+  .rv-public { background: #fff; padding: 0; display: block; min-height: 0; }
+}

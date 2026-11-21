@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { billProblem, chequeDirections, chequeStatuses, expenseProblem, invoiceMath, invoiceProblem, receiptProblem, type BillInput, type BudgetInput, type ChequeInput, type ExpenseInput, type InvoiceInput, type ReceiptInput } from "@/lib/accounting";
 import type { ActionResult } from "@/lib/directory";
@@ -285,6 +286,28 @@ export async function updateExpense(idToken: string, expenseId: string, input: E
 
 // ---------- Receipts (money received) ----------
 
+/**
+ * Returns the token of a receipt's client link, creating one when the receipt has none.
+ * With `renew`, issues a new token so links shared earlier stop working.
+ */
+export async function receiptShareToken(idToken: string, receiptId: string, renew = false): Promise<ActionResult & { token?: string }> {
+  try {
+    const who = await manager(idToken);
+    if ("error" in who) return { ok: false, error: who.error };
+    const ref = adminDb().collection("receipts").doc(receiptId);
+    const snap = await ref.get();
+    if (!snap.exists) return { ok: false, error: "fin.invalid" };
+    const current = snap.data()?.shareToken;
+    if (!renew && typeof current === "string" && current) return { ok: true, id: receiptId, token: current };
+    const token = newShareToken();
+    await ref.update({ shareToken: token });
+    if (renew) await audit("receipts.relink", who.uid, receiptId, String(snap.data()?.number ?? ""));
+    return { ok: true, id: receiptId, token };
+  } catch {
+    return { ok: false, error: "auth.failed" };
+  }
+}
+
 function cleanReceipt(input: ReceiptInput): ReceiptInput | string {
   const problem = receiptProblem(input);
   if (problem) return problem;
@@ -297,10 +320,18 @@ function cleanReceipt(input: ReceiptInput): ReceiptInput | string {
     amount: input.amount,
     receivedOn: input.receivedOn,
     method: input.method,
-    reference: clip(input.reference, 80),
+    reference: input.method === "cash" ? "" : clip(input.reference, 80),
+    bank: input.method === "cash" ? "" : clip(input.bank ?? "", 120),
+    purposeEn: clip(input.purposeEn, 240),
+    purposeAr: clip(input.purposeAr, 240),
     invoiceId: clip(input.invoiceId ?? "", 64),
     note: clip(input.note, 400),
   };
+}
+
+/** Unguessable token for the client's link to a receipt voucher. */
+function newShareToken() {
+  return randomBytes(24).toString("base64url");
 }
 
 async function nextReceiptNumber() {
@@ -344,7 +375,7 @@ export async function createReceipt(idToken: string, input: ReceiptInput): Promi
     const problem = await syncInvoiceReceived(receipt.invoiceId, { id: ref.id, amount: receipt.amount });
     if (problem) return { ok: false, error: problem };
     const number = await nextReceiptNumber();
-    await ref.set({ ...receipt, number, createdBy: who.uid, createdAt: FieldValue.serverTimestamp() });
+    await ref.set({ ...receipt, number, shareToken: newShareToken(), createdBy: who.uid, createdAt: FieldValue.serverTimestamp() });
     await audit("receipts.create", who.uid, ref.id, number);
     return { ok: true, id: ref.id };
   } catch {

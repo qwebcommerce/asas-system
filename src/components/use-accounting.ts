@@ -30,20 +30,26 @@ export function useAccounting() {
       return;
     }
     const db = firebaseDb();
+    // Ready once both invoices and receipts have answered (a receipt's voucher needs both)
+    const pending = new Set(["invoices", "receipts"]);
+    const settle = (name: string) => {
+      pending.delete(name);
+      if (pending.size === 0) setReady(true);
+    };
     const listen = <T,>(name: string, map: (id: string, data: Record<string, unknown>) => T | null, set: (rows: T[]) => void, markReady?: boolean) => onSnapshot(collection(db, name), (snap) => {
       set(snap.docs.flatMap((item) => {
         const row = map(item.id, item.data());
         return row ? [row] : [];
       }));
-      if (markReady) setReady(true);
+      if (markReady) settle(name);
     }, () => {
-      if (markReady) setReady(true);
+      if (markReady) settle(name);
     });
     const unsubscribers = [
       listen("invoices", mapInvoice, setInvoices, true),
       listen("bills", mapBill, setBills),
       listen("expenses", mapExpense, setExpenses),
-      listen("receipts", mapReceipt, setReceipts),
+      listen("receipts", mapReceipt, setReceipts, true),
     ];
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [accessReady, canView, configured, profile, user]);
