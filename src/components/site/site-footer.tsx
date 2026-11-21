@@ -37,7 +37,7 @@ export async function SiteFooter({ locale, current, path }: { locale: Locale; cu
             <ul>
               <li><Link href={sitePath(locale)}>{t("nav.home")}</Link></li>
               <li><Link href={home("services")}>{t("nav.services")}</Link></li>
-              <li><Link href={home("work")}>{t("nav.work")}</Link></li>
+              <li><Link href={sitePath(locale, "/our-work")}>{t("nav.work")}</Link></li>
               <li><Link href={home("about")}>{t("nav.about")}</Link></li>
               <li><Link href={home("contact")}>{t("nav.contact")}</Link></li>
               <li>

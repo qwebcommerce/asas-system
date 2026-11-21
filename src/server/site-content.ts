@@ -1,7 +1,9 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { adminDb, isAdminConfigured } from "@/lib/firebase-admin";
 import { mapBlogPost, mapSiteDocument, pick, type BlogCategory, type SiteDocCategory } from "@/lib/website";
-import { sampleDocuments, samplePosts, type SamplePhoto } from "@/lib/website-samples";
+import type { OfferKind } from "@/lib/offers";
+import { mapProject } from "@/lib/projects";
+import { sampleDocuments, sampleProjects, samplePosts, type SamplePhoto, type SampleProjectPhoto } from "@/lib/website-samples";
 
 /*
  * Content for the public website pages.
@@ -160,4 +162,104 @@ export async function siteDocuments(locale: string): Promise<{ documents: Docume
       size: 0,
     })),
   };
+}
+
+// ---------------------------------------------------------------- projects
+
+export type ProjectCover = { kind: "sample"; photo: SampleProjectPhoto } | { kind: "stored"; src: string };
+
+/** Public view of a project. Client details, budget and notes are never included. */
+export type ProjectView = {
+  slug: string;
+  name: string;
+  kind: OfferKind;
+  scope: string;
+  location: string;
+  summary: string;
+  year: string;
+  cover: ProjectCover;
+  coverAlt: string;
+};
+
+type PublicProject = {
+  id: string;
+  slug: string;
+  nameEn: string;
+  nameAr: string;
+  kind: OfferKind;
+  locationEn: string;
+  locationAr: string;
+  summaryEn: string;
+  summaryAr: string;
+  year: string;
+};
+
+async function storedProjects(): Promise<PublicProject[]> {
+  "use cache";
+  cacheTag("website");
+  cacheLife("hours");
+  if (!isAdminConfigured()) return [];
+  try {
+    const snap = await adminDb().collection("projects").where("published", "==", true).get();
+    return snap.docs
+      .flatMap((doc) => mapProject(doc.id, doc.data()) ?? [])
+      .filter((project) => project.hasCover && project.slug)
+      .sort((a, b) => (b.endOn || b.startOn).localeCompare(a.endOn || a.startOn) || b.code.localeCompare(a.code))
+      // Only public fields leave this function
+      .map((project) => ({
+        id: project.id,
+        slug: project.slug,
+        nameEn: project.nameEn,
+        nameAr: project.nameAr,
+        kind: project.kind,
+        locationEn: project.locationEn,
+        locationAr: project.locationAr,
+        summaryEn: project.summaryEn,
+        summaryAr: project.summaryAr,
+        year: (project.endOn || project.startOn).slice(0, 4),
+      }));
+  } catch (error) {
+    console.error("website projects unavailable", error);
+    return [];
+  }
+}
+
+/** Published projects for a locale; the sample projects while none is published. */
+export async function siteProjects(locale: string, kindLabel: (kind: OfferKind) => string): Promise<{ projects: ProjectView[]; samples: boolean }> {
+  const stored = await storedProjects();
+  if (stored.length > 0) {
+    return {
+      samples: false,
+      projects: stored.map((project) => ({
+        slug: project.slug,
+        name: pick(project.nameEn, project.nameAr, locale),
+        kind: project.kind,
+        scope: kindLabel(project.kind),
+        location: pick(project.locationEn, project.locationAr, locale),
+        summary: pick(project.summaryEn, project.summaryAr, locale),
+        year: project.year,
+        cover: { kind: "stored", src: `/api/site-files/project/${project.id}` },
+        coverAlt: pick(project.nameEn, project.nameAr, locale),
+      })),
+    };
+  }
+  return {
+    samples: true,
+    projects: sampleProjects.map((project) => ({
+      slug: project.slug,
+      name: pick(project.nameEn, project.nameAr, locale),
+      kind: project.kind,
+      scope: pick(project.scopeEn, project.scopeAr, locale),
+      location: pick(project.locationEn, project.locationAr, locale),
+      summary: pick(project.summaryEn, project.summaryAr, locale),
+      year: project.year,
+      cover: { kind: "sample", photo: project.photo },
+      coverAlt: pick(project.altEn, project.altAr, locale),
+    })),
+  };
+}
+
+export async function projectSlugs() {
+  const stored = await storedProjects();
+  return [...new Set([...sampleProjects.map((project) => project.slug), ...stored.map((project) => project.slug)])];
 }

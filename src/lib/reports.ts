@@ -13,6 +13,8 @@ export type WorkItem = {
 
 export type ProjectReport = {
   id: string;
+  /** Linked project; projectEn/projectAr are copied from it. */
+  projectId: string;
   projectEn: string;
   projectAr: string;
   date: string;
@@ -26,6 +28,7 @@ export type ProjectReport = {
 };
 
 export type ReportInput = {
+  projectId: string;
   projectEn: string;
   projectAr: string;
   date: string;
@@ -63,6 +66,7 @@ export function mapProjectReport(id: string, data: Record<string, unknown>): Pro
   }) : [];
   return {
     id,
+    projectId: text(data.projectId),
     projectEn,
     projectAr: text(data.projectAr),
     date,

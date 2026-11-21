@@ -5,7 +5,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/components/auth-provider";
 import { usePermissions } from "@/components/permissions-provider";
 import { canReadAll, canWriteModule } from "@/lib/access";
-import { mapBill, mapExpense, mapInvoice, type Bill, type Expense, type Invoice } from "@/lib/accounting";
+import { mapBill, mapExpense, mapInvoice, mapReceipt, type Bill, type Expense, type Invoice, type Receipt } from "@/lib/accounting";
 import { firebaseDb } from "@/lib/firebase-client";
 
 export function useAccounting() {
@@ -17,6 +17,7 @@ export function useAccounting() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export function useAccounting() {
       setInvoices([]);
       setBills([]);
       setExpenses([]);
+      setReceipts([]);
       setReady(Boolean(configured && (!user || (profile && accessReady && !canView))));
       return;
     }
@@ -41,9 +43,10 @@ export function useAccounting() {
       listen("invoices", mapInvoice, setInvoices, true),
       listen("bills", mapBill, setBills),
       listen("expenses", mapExpense, setExpenses),
+      listen("receipts", mapReceipt, setReceipts),
     ];
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [accessReady, canView, configured, profile, user]);
 
-  return { invoices, bills, expenses, ready, canView, canManage };
+  return { invoices, bills, expenses, receipts, ready, canView, canManage };
 }

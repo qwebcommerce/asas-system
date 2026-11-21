@@ -7,7 +7,7 @@
  * Measurements are in points (pt), as in the PDFs. Styles: .adoc in src/styles/asas.css.
  */
 import { contractTerms } from "@/lib/contract-terms";
-import { letterhead, offerTotals, paymentAmounts, type Offer, type OfferPayment } from "@/lib/offers";
+import { letterhead, offerTotals, paymentAmounts, totalArea, type Offer, type OfferPayment } from "@/lib/offers";
 
 type Variant = "quotation" | "contract";
 
@@ -86,19 +86,19 @@ function dmy(day: string) {
   return y && m && d ? `${d}-${m}-${y}` : "";
 }
 
-function areaEn(offer: Offer) {
-  if (offer.areaFrom && offer.areaTo && offer.areaFrom !== offer.areaTo) return `${offer.areaFrom} to ${offer.areaTo}`;
-  return String(offer.areaFrom ?? offer.areaTo ?? "");
+/** Total area of the measured rows (m² × units), e.g. "900". */
+function areaOf(offer: Offer) {
+  const area = totalArea(offer.lines);
+  return area > 0 ? new Intl.NumberFormat("en", { maximumFractionDigits: 1, useGrouping: false }).format(area) : "";
 }
 
-function areaAr(offer: Offer, digits: (value: string | number) => string) {
-  if (offer.areaFrom && offer.areaTo && offer.areaFrom !== offer.areaTo) return `${digits(offer.areaFrom)} إلى ${digits(offer.areaTo)}`;
-  const one = offer.areaFrom ?? offer.areaTo;
-  return one ? digits(one) : "";
-}
-
-function hasArea(offer: Offer) {
-  return Boolean(offer.areaFrom || offer.areaTo);
+/** Scope bullets: the measured rows' names, or the scope text for offers without rows. */
+function scopeRowsOf(offer: Offer) {
+  const named = offer.lines.filter((line) => line.roomEn || line.roomAr).map((line) => [line.roomEn, line.roomAr]);
+  if (named.length > 0) return named;
+  const en = lines(offer.scopeEn);
+  const ar = lines(offer.scopeAr);
+  return Array.from({ length: Math.max(en.length, ar.length) }, (_, i) => [en[i] ?? "", ar[i] ?? ""]);
 }
 
 /** The contract is signed, so the first payment falls due on signing the contract, not the quotation. */
@@ -151,11 +151,10 @@ function Payments({
 // ---------------------------------------------------------------- quotation (2 pages)
 
 export function ArchitectureQuotation({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discountPct, offer.packageAmount);
+  const totals = offerTotals(offer.lines, offer.discountPct);
   const due = paymentAmounts(totals.total, offer.payments);
-  const scopeEn = lines(offer.scopeEn);
-  const scopeAr = lines(offer.scopeAr);
-  const scopeRows = Array.from({ length: Math.max(scopeEn.length, scopeAr.length) }, (_, i) => [scopeEn[i] ?? "", scopeAr[i] ?? ""]);
+  const scopeRows = scopeRowsOf(offer);
+  const area = areaOf(offer);
   const title = { en: "ARCHITECTURE DESIGN QUOTATION", ar: "عرض سعر تصميم معماري" };
   const year = offer.issuedOn.slice(0, 4) || String(new Date().getFullYear());
 
@@ -176,11 +175,11 @@ export function ArchitectureQuotation({ offer }: { offer: Offer }) {
             </ul>
           </section>
         ) : null}
-        {hasArea(offer) ? (
+        {area ? (
           <Bar
             className="adoc-bar--area"
-            en={<>TOTAL AREA&nbsp; |{areaEn(offer)}&nbsp;&nbsp; <small>SQM</small></>}
-            ar={<>إجمالي المساحة | {areaAr(offer, String)}&nbsp; <small>متر مربع</small></>}
+            en={<>TOTAL AREA&nbsp; |{area}&nbsp;&nbsp; <small>SQM</small></>}
+            ar={<>إجمالي المساحة | {area}&nbsp; <small>متر مربع</small></>}
           />
         ) : null}
         {offer.stages.length > 0 ? (
@@ -252,11 +251,11 @@ export function ArchitectureQuotation({ offer }: { offer: Offer }) {
 // ---------------------------------------------------------------- contract (3 pages)
 
 export function ArchitectureContract({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discountPct, offer.packageAmount);
+  const totals = offerTotals(offer.lines, offer.discountPct);
   const due = paymentAmounts(totals.total, offer.payments);
   const title = { en: "ARCHITECTURE CONTRACT", ar: "عقد تصميم معماري" };
   const ar = arabicDigits;
-  const area = areaAr(offer, ar);
+  const area = areaOf(offer) ? ar(areaOf(offer)) : "";
   const project = offer.projectAr || "المشروع";
 
   return (
@@ -293,7 +292,7 @@ export function ArchitectureContract({ offer }: { offer: Offer }) {
           <div className="adoc-prose" dir="rtl" lang="ar">
             <p>
               يتضمن نطاق هذا المشروع تقديم خدمات التصميم المعماري ل{project}
-              {area ? `، وذلك وفقاً للمساحة الإجمالية التقديرية المحددة من ${area} متر مربع` : ""}
+              {area ? `، وذلك وفقاً للمساحة الإجمالية التقديرية البالغة ${area} متر مربع` : ""}
             </p>
             <p>
               وتشمل الأعمال إعداد وتطوير المخططات المعمارية والواجهات، وإعداد المخططات الإنشائية ومخططات الخدمات، بالإضافة إلى إعداد التصاميم ثلاثية الأبعاد (3D Renders) لإظهار الشكل والتصور النهائي للمشروع، وذلك وفقاً لمراحل حزمة التصميم المعتمدة وبما يضمن التنسيق والتكامل بين مختلف التخصصات.

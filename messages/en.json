@@ -59,7 +59,8 @@
     "dash": "Dashboard",
     "inv": "Invoices",
     "journal": "Journal",
-    "reports": "Reports"
+    "reports": "Reports",
+    "receipts": "Receipts"
   },
   "auth": {
     "back": "Back to sign in",
@@ -304,14 +305,16 @@
       "bills": "New bill",
       "cheques": "New cheque",
       "budgets": "New budget",
-      "expenses": "New expense"
+      "expenses": "New expense",
+      "receipts": "New receipt"
     },
     "edit": {
       "invoices": "Edit invoice",
       "bills": "Edit bill",
       "cheques": "Edit cheque",
       "budgets": "Edit budget",
-      "expenses": "Edit expense"
+      "expenses": "Edit expense",
+      "receipts": "Edit receipt"
     },
     "accounts": {
       "ar": "Accounts receivable",
@@ -321,7 +324,25 @@
       "expense": "Expenses",
       "received": "Money received",
       "paid": "Money paid"
-    }
+    },
+    "invoice": "Invoice",
+    "receipt": "Receipt",
+    "payer": "Received from",
+    "payerAr": "Received from (Arabic)",
+    "receivedOn": "Received on",
+    "methodLabel": "Method",
+    "method": {
+      "transfer": "Bank transfer",
+      "cheque": "Cheque",
+      "cash": "Cash",
+      "card": "Card"
+    },
+    "againstInvoice": "Against invoice",
+    "noInvoice": "Not against an invoice",
+    "noReceipts": "No receipts recorded yet.",
+    "receiptsNote": "Money received from clients. Linking an invoice updates its received amount.",
+    "needMethod": "Choose how the money was received.",
+    "invoiceHasReceipts": "This invoice has receipts recorded against it. Delete those receipts first."
   },
   "hr": {
     "add": "Add employee",
@@ -460,7 +481,8 @@
     "signOut": "Sign out",
     "users": "Users & Access",
     "workspace": "Workspace",
-    "website": "Website"
+    "website": "Website",
+    "projects": "Projects"
   },
   "off": {
     "addM": "Add measurement",
@@ -507,9 +529,6 @@
     "finishing": "Finishing",
     "architecture": "Architectural design",
     "area": "Total area",
-    "areaFrom": "Area from m²",
-    "areaTo": "Area to m²",
-    "packageAmount": "Package amount",
     "scope": "Scope",
     "scopeAr": "Scope in Arabic",
     "stages": "Design package",
@@ -545,8 +564,6 @@
     "needId": "Enter the ID number in digits, or leave it empty.",
     "needPhone": "Enter a phone number, or leave it empty.",
     "needDate": "Enter the offer date.",
-    "needArea": "Enter the area in whole square metres. The first figure cannot be larger than the second.",
-    "needPackage": "Enter the package amount as a whole number.",
     "needStage": "Enter each stage in English and Arabic.",
     "needPay": "Enter each payment in English and Arabic.",
     "payTotal": "Payment percents must add up to 100.",
@@ -573,7 +590,22 @@
       "fitout": "Painting, gypsum, flooring and joinery, measured and priced room by room.",
       "interior": "Interior concepts, materials, lighting and furniture for homes and offices.",
       "construction": "Building works for new projects and extensions, from structure to handover."
-    }
+    },
+    "needUnits": "Units must be a whole number from 1 to 999.",
+    "ratesNote": "Unit prices are placeholders until the official measurement and price lists are added. You can change any price for this offer.",
+    "totalArea": "Total area",
+    "areas": "Areas & pricing",
+    "areaName": "Area",
+    "areaNameEn": "Area name (e.g. Ground Floor)",
+    "areaNameAr": "Area name in Arabic",
+    "sqm": "Area m²",
+    "units": "Units",
+    "unitPrice": "Unit price (QAR / m²)",
+    "noAreas": "Add the areas to design, e.g. Ground Floor, First Floor.",
+    "addArea": "Add area",
+    "design": "Design",
+    "noProject": "Not linked to a project",
+    "linkedProject": "Linked project"
   },
   "ov": {
     "activity": "Recent activity",
@@ -715,7 +747,8 @@
     "itemEmpty": "No work items yet.",
     "documents": "Documents",
     "preview": "Preview",
-    "fileLimit": "A report can hold up to 10 files."
+    "fileLimit": "A report can hold up to 10 files.",
+    "needProject": "Choose the project this report is for."
   },
   "req": {
     "acc": "Asks for Accounting",
@@ -808,7 +841,8 @@
     "users": "Users & Access · ASAS System",
     "email": "Email · ASAS System",
     "forgot": "Reset password · ASAS System",
-    "website": "Website · ASAS System"
+    "website": "Website · ASAS System",
+    "projects": "Projects · ASAS System"
   },
   "top": {
     "ai": "Open AI assistant",
@@ -1019,7 +1053,9 @@
       "blogsTitle": "ASAS Journal — Blogs",
       "blogsDesc": "Ideas, materials and practical thinking for the places we call our own.",
       "docsTitle": "ASAS Resource Room — Documents",
-      "docsDesc": "Get to know our company, explore our services and prepare for your first conversation with ASAS."
+      "docsDesc": "Get to know our company, explore our services and prepare for your first conversation with ASAS.",
+      "workTitle": "ASAS Projects — Our work",
+      "workDesc": "Homes and commercial spaces designed, built and finished by ASAS Executive Contracting in Qatar."
     },
     "nav": {
       "main": "Main",
@@ -1153,30 +1189,29 @@
       "title": "Selected work<br></br>across Qatar",
       "noteTitle": "Homes and commercial spaces",
       "note": "Designed, built and finished by the ASAS team since 2015.",
-      "projects": [
-        [
-          "Modern interior that reflects luxury and comfort",
-          "Residential · Full interior renovation",
-          "Modern majlis interior with chandelier"
-        ],
-        [
-          "Stone villa",
-          "Plans · Construction",
-          "Stone villa facade with balcony"
-        ],
-        [
-          "Family lounge",
-          "Interior · Furniture",
-          "Family lounge with long seating"
-        ],
-        [
-          "Media wall",
-          "Finishing",
-          "Majlis with wooden media wall"
-        ]
-      ],
       "all": "View all projects",
-      "disclosure": "Visual direction illustrated with concept imagery."
+      "disclosure": "Visual direction illustrated with concept imagery.",
+      "kinds": {
+        "architecture": "Architectural design",
+        "fitout": "Fit-out",
+        "interior": "Interior design",
+        "construction": "Construction"
+      },
+      "pageLabel": "Our work  /  Projects",
+      "pageTitle": "Built with<br></br>precision.",
+      "pageIntro": "A selection of homes and spaces we have designed, built and finished across Qatar.",
+      "collection": "Selected projects.",
+      "filterLabel": "Filter projects",
+      "allProjects": "All projects",
+      "ctaTitle": "Planning a project?",
+      "ctaText": "Tell us about your plot or space and we will take it from there.",
+      "breadcrumb": "Projects",
+      "factType": "Type",
+      "factLocation": "Location",
+      "factYear": "Year",
+      "back": "All projects",
+      "more": "More projects",
+      "closing": "From the first plan to the final finish, the ASAS team coordinated design, construction and finishing as one, so every detail arrived as drawn."
     },
     "about": {
       "eyebrow": "About ASAS",
@@ -1436,5 +1471,98 @@
     "requestFailed": "The server did not accept the request, so nothing was saved. Reload the page and try again; if it keeps happening, ask your administrator to check the server log.",
     "uploading": "Uploading… {percent}%",
     "uploadFailed": "The PDF could not be uploaded. Check your connection and try again."
+  },
+  "prj": {
+    "eyebrow": "Company projects",
+    "new": "New project",
+    "edit": "Edit project",
+    "saved": "Project saved",
+    "back": "Projects",
+    "missing": "This project was not found.",
+    "count": "{count, plural, =0 {No projects yet} one {# project} other {# projects}}",
+    "search": "Search name, client, code or location",
+    "allStatuses": "All statuses",
+    "empty": "No projects yet. Add your first project to link its reports, bills, receipts and documents.",
+    "noMatch": "No projects match your search.",
+    "project": "Project",
+    "client": "Client",
+    "type": "Type",
+    "budget": "Budget",
+    "spent": "Spent",
+    "remaining": "Remaining budget",
+    "received": "Received",
+    "status": {
+      "planning": "Planning",
+      "active": "In progress",
+      "onhold": "On hold",
+      "completed": "Completed"
+    },
+    "onWebsite": "On website",
+    "notOnWebsite": "Not on the website",
+    "sectionProject": "Project",
+    "sectionClient": "Client",
+    "sectionNotes": "Internal notes",
+    "sectionWebsite": "Public website",
+    "name": "Project name",
+    "location": "Site location",
+    "budgetQar": "Budget (QAR)",
+    "startOn": "Start date",
+    "endOn": "Expected handover",
+    "clientName": "Client name",
+    "phone": "Phone",
+    "email": "Email",
+    "idNo": "QID / ID number",
+    "address": "Client address",
+    "notes": "Notes",
+    "publish": "Show this project on the website",
+    "publishHint": "Only the project name, type, location, summary and cover image are shown publicly. Client details, budget and notes stay private.",
+    "summary": "Public summary",
+    "cover": "Cover image",
+    "required": "Required.",
+    "nameLatin": "The English name needs Latin letters or numbers (it becomes the page address).",
+    "badPhone": "Enter a valid phone number.",
+    "badEmail": "Enter a valid email address.",
+    "badId": "Use 5 to 20 digits.",
+    "badBudget": "Enter the budget as a whole number of QAR.",
+    "badDate": "Enter a valid date.",
+    "endBeforeStart": "The handover date is before the start date.",
+    "summaryRequired": "Write a short public summary in this language to publish.",
+    "coverRequired": "Add a cover image to show the project on the website.",
+    "forbidden": "You do not have permission to manage projects.",
+    "inUse": "This project still has reports, bills, receipts, offers, invoices or documents linked to it. Move or delete those first.",
+    "choose": "Choose a project",
+    "none": "No project",
+    "notProject": "Not related to a project (office, rent…)",
+    "unavailable": "Project not available",
+    "noAccess": "You cannot see the projects list. Ask an administrator for Projects access.",
+    "tabOverview": "Overview",
+    "tabReports": "Reports",
+    "tabCosts": "Bills & expenses",
+    "tabReceipts": "Receipts",
+    "tabDocuments": "Documents",
+    "noDates": "No dates set",
+    "spentNote": "{count, plural, one {# bill or expense} other {# bills and expenses}}",
+    "usedPct": "{pct}% of budget used",
+    "noBudget": "No budget set",
+    "receiptsNote": "{count, plural, one {# receipt} other {# receipts}}",
+    "service": "Service",
+    "progress": "Progress",
+    "noReports": "No site reports for this project yet.",
+    "noCosts": "No bills or expenses for this project yet.",
+    "noReceipts": "No payments received for this project yet.",
+    "docOffers": "Offers & contracts",
+    "docInvoices": "Invoices",
+    "docFiles": "Uploaded documents",
+    "newOffer": "New offer",
+    "offer": "Offer",
+    "quotation": "Quotation",
+    "contract": "Contract",
+    "noOffers": "No offers linked to this project.",
+    "noInvoices": "No invoices for this project.",
+    "noFiles": "No uploaded documents for this project. Link one from Documents.",
+    "noModuleAccess": "You do not have access to this section.",
+    "deleteQ": "Delete this project?",
+    "deleteNote": "The project is removed from the system and the website. Projects that still have linked records cannot be deleted.",
+    "missingProject": "The selected project no longer exists."
   }
 }

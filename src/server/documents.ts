@@ -6,6 +6,7 @@ import { documentKinds, type LibraryDocumentInput } from "@/lib/documents";
 import { adminDb } from "@/lib/firebase-admin";
 import { removePrivateFile, signedReadUrl } from "@/server/blobs";
 import { canReadAll, canWriteModule, seesOwn } from "@/lib/access";
+import { projectLink } from "@/server/project-link";
 import { actor, audit, type Gate } from "@/server/session";
 
 function clean(input: LibraryDocumentInput): LibraryDocumentInput | null {
@@ -16,7 +17,7 @@ function clean(input: LibraryDocumentInput): LibraryDocumentInput | null {
   if (!titleEn || !titleAr || !documentKinds.includes(input.kind)) return null;
   const expiresOn = /^\d{4}-\d{2}-\d{2}$/.test(input.expiresOn) ? input.expiresOn : "";
   if (input.hasExpiry && !expiresOn) return null;
-  return { titleEn, titleAr, kind: input.kind, projectEn, projectAr, hasExpiry: input.hasExpiry && Boolean(expiresOn), expiresOn: input.hasExpiry ? expiresOn : "" };
+  return { titleEn, titleAr, kind: input.kind, projectId: (input.projectId ?? "").trim().slice(0, 64), projectEn, projectAr, hasExpiry: input.hasExpiry && Boolean(expiresOn), expiresOn: input.hasExpiry ? expiresOn : "" };
 }
 
 async function reader(idToken: string) {
@@ -50,8 +51,11 @@ export async function createLibraryDocument(idToken: string, input: LibraryDocum
     const who = await reader(idToken);
     if ("error" in who) return { ok: false, error: who.error };
     if (!canEditDocument(who, who.uid)) return { ok: false, error: "doc.forbidden" };
-    const document = clean(input);
-    if (!document) return { ok: false, error: "us.invalid" };
+    const cleaned = clean(input);
+    if (!cleaned) return { ok: false, error: "us.invalid" };
+    const link = await projectLink(cleaned.projectId, cleaned);
+    if (!link) return { ok: false, error: "prj.missingProject" };
+    const document = { ...cleaned, ...link };
     const ref = await adminDb().collection("libraryDocuments").add({
       ...document,
       storagePath: "",
@@ -72,8 +76,11 @@ export async function updateLibraryDocument(idToken: string, documentId: string,
   try {
     const access = await editable(idToken, documentId);
     if ("error" in access) return { ok: false, error: access.error };
-    const document = clean(input);
-    if (!document) return { ok: false, error: "us.invalid" };
+    const cleaned = clean(input);
+    if (!cleaned) return { ok: false, error: "us.invalid" };
+    const link = await projectLink(cleaned.projectId, cleaned);
+    if (!link) return { ok: false, error: "prj.missingProject" };
+    const document = { ...cleaned, ...link };
     await access.snap.ref.update({ ...document, updatedAt: FieldValue.serverTimestamp() });
     await audit("documents.update", access.who.uid, documentId, document.titleEn);
     return { ok: true, id: documentId };

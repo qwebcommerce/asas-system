@@ -5,11 +5,12 @@ import { useLocale, useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
+import { ProjectSelect } from "@/components/project-select";
 import { useOffers } from "@/components/use-offers";
 import { Toast } from "@/components/ui/overlay";
 import { Link, useRouter } from "@/i18n/navigation";
 import { qatarToday } from "@/lib/hr";
-import { architectureStages, isOfferKind, defaultShape, defaultPayments, lineAmount, measureQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, offerTrades, offerUnits, paymentAmounts, priceById, priceList, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit } from "@/lib/offers";
+import { architectureStages, isOfferKind, defaultShape, defaultPayments, lineAmount, lineQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, offerUnits, paymentAmounts, priceById, priceListFor, totalArea, tradesFor, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit } from "@/lib/offers";
 import { createOffer, updateOffer } from "@/server/offers";
 
 const savedFlag = "asas-offer-saved";
@@ -26,6 +27,7 @@ type DraftLine = {
   h: string;
   qty: string;
   rate: string;
+  units: string;
 };
 
 export function OfferForm({ offerId, type }: { offerId?: string; type?: string }) {
@@ -123,23 +125,22 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
   // The type is chosen before the form opens and is fixed once the offer is saved
   const kind: OfferKind = initial?.kind ?? newKind;
   const [issuedOn, setIssuedOn] = useState(initial?.issuedOn || qatarToday());
-  const [areaFrom, setAreaFrom] = useState(initial?.areaFrom == null ? "" : String(initial.areaFrom));
-  const [areaTo, setAreaTo] = useState(initial?.areaTo == null ? "" : String(initial.areaTo));
-  const [packageAmount, setPackageAmount] = useState(String(initial?.packageAmount ?? 0));
+  const [projectId, setProjectId] = useState(initial?.projectId ?? "");
   const [scopeEn, setScopeEn] = useState(initial?.scopeEn ?? "");
   const [scopeAr, setScopeAr] = useState(initial?.scopeAr ?? "");
   const [stages, setStages] = useState<StageDraft[]>(() => (initial ? initial.stages : newKind === "architecture" ? architectureStages() : []).map(stageDraft));
   const [payments, setPayments] = useState<PayDraft[]>(() => (initial?.payments?.length ? initial.payments : defaultPayments()).map(payDraft));
   const [savedNote, setSavedNote] = useState("");
   const [toast, setToast] = useState(false);
-  const [lines, setLines] = useState<DraftLine[]>(() => (initial?.lines.length ? initial.lines.map(toDraft) : [blankLine()]));
+  const designOnly = kind === "architecture";
+  const [lines, setLines] = useState<DraftLine[]>(() => (initial?.lines.length ? initial.lines.map(toDraft) : [blankLine(designOnly ? "arch-design" : "paint")]));
   const [filter, setFilter] = useState<OfferTrade | "all">("all");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const visible = lines.filter((line) => filter === "all" || priceById(line.priceId)?.trade === filter);
   const measured = lines.map(toLine).filter((line): line is OfferLine => line !== null);
-  const packageValue = whole(packageAmount, 100_000_000) ?? 0;
-  const totals = offerTotals(measured, whole(discountPct, 100) ?? 0, packageValue);
+  const totals = offerTotals(measured, whole(discountPct, 100) ?? 0);
+  const area = totalArea(measured);
   const due = paymentAmounts(totals.total, payments.map((payment) => ({ percent: whole(payment.percent, 100) ?? -1 })));
 
   useEffect(() => {
@@ -167,13 +168,6 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
   async function save() {
     if (saving) return;
     const discount = whole(discountPct, 100);
-    const from = readArea(areaFrom);
-    const to = readArea(areaTo);
-    if (!from.ok || !to.ok) {
-      setSavedNote("");
-      setError(t("off.needArea"));
-      return;
-    }
     const input: OfferInput = {
       clientEn,
       clientAr,
@@ -187,10 +181,8 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
       projectAr,
       reference,
       kind,
+      projectId,
       issuedOn,
-      areaFrom: from.value,
-      areaTo: to.value,
-      packageAmount: whole(packageAmount, 100_000_000) ?? -1,
       scopeEn,
       scopeAr,
       stages: stages.map(toStage).filter((stage) => stage.titleEn || stage.titleAr || stage.detailEn || stage.detailAr),
@@ -262,6 +254,25 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
               <Field label={t("off.clientAr")} value={clientAr} onChange={setClientAr} />
               <Field label={t("off.project")} value={projectEn} onChange={setProjectEn} />
               <Field label={t("off.projectAr")} value={projectAr} onChange={setProjectAr} />
+              <ProjectSelect
+                id="offer-project"
+                label={t("off.linkedProject")}
+                none={t("off.noProject")}
+                value={projectId}
+                onChange={(id, project) => {
+                  setProjectId(id);
+                  if (!project) return;
+                  // Fill empty fields from the project to save typing
+                  if (!clientEn) setClientEn(project.clientEn);
+                  if (!clientAr) setClientAr(project.clientAr);
+                  if (!projectEn) setProjectEn(project.nameEn);
+                  if (!projectAr) setProjectAr(project.nameAr);
+                  if (!phone) setPhone(project.clientPhone);
+                  if (!clientId) setClientId(project.clientIdNo);
+                  if (!addressEn) setAddressEn(project.clientAddressEn);
+                  if (!addressAr) setAddressAr(project.clientAddressAr);
+                }}
+              />
               <div className="field">
                 <label>{t("col.status")}</label>
                 <select className="select" value={status} onChange={(event) => setStatus(event.target.value as OfferStatus)}>
@@ -278,12 +289,13 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
               <Field label={t("off.capacityAr")} value={capacityAr} onChange={setCapacityAr} />
               <Field label={t("off.projectNo")} value={reference} onChange={setReference} />
               <Field label={t("off.issuedOn")} value={issuedOn} onChange={setIssuedOn} type="date" />
-              <Field label={t("off.areaFrom")} value={areaFrom} onChange={setAreaFrom} type="number" />
-              <Field label={t("off.areaTo")} value={areaTo} onChange={setAreaTo} type="number" />
-              <Field label={t("off.packageAmount")} value={packageAmount} onChange={setPackageAmount} type="number" />
             </div>
-            <Field label={t("off.scope")} value={scopeEn} onChange={setScopeEn} area />
-            <Field label={t("off.scopeAr")} value={scopeAr} onChange={setScopeAr} area />
+            {designOnly ? null : (
+              <>
+                <Field label={t("off.scope")} value={scopeEn} onChange={setScopeEn} area />
+                <Field label={t("off.scopeAr")} value={scopeAr} onChange={setScopeAr} area />
+              </>
+            )}
           </div>
           <div className="card stack">
             <div className="between">
@@ -306,101 +318,107 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
               {t("off.stageAdd")}
             </button>
           </div>
-          <div className="hstack">
-            <button type="button" className="chip" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>{t("off.all")}</button>
-            {offerTrades.map((trade) => (
-              <button key={trade} type="button" className="chip" aria-pressed={filter === trade} onClick={() => setFilter(trade)}>{t(`off.${trade}`)}</button>
-            ))}
-          </div>
-          <div className="card card--flush table-wrap">
-            <table className="table table--cards">
-              <thead>
-                <tr>
-                  <th>{t("col.room")}</th>
-                  <th>{t("col.work")}</th>
-                  <th>{t("col.unit")}</th>
-                  <th>L m</th>
-                  <th>W m</th>
-                  <th>H m</th>
-                  <th>{t("col.qty")}</th>
-                  <th>{t("col.rate")}</th>
-                  <th className="end">{t("col.total")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {visible.length === 0 ? <tr><td colSpan={10}>{t("off.emptyLines")}</td></tr> : null}
-                {visible.map((line) => {
-                  const measuredLine = toLine(line);
-                  const qty = measuredLine ? measureQty(measuredLine.shape, measuredLine.l, measuredLine.w, measuredLine.h, measuredLine.qty) : 0;
-                  const amount = measuredLine ? lineAmount(measuredLine) : 0;
-                  return (
-                    <tr key={line.key}>
-                      <td data-label={t("col.room")}>
-                        <input className="input" placeholder={t("off.roomEn")} value={line.roomEn} onChange={(event) => updateLine(line.key, { roomEn: event.target.value })} />
-                        <input className="input" placeholder={t("off.roomAr")} value={line.roomAr} onChange={(event) => updateLine(line.key, { roomAr: event.target.value })} style={{ marginTop: 6 }} />
-                      </td>
-                      <td data-label={t("col.work")}>
-                        <select
-                          className="select"
-                          value={line.priceId}
-                          onChange={(event) => {
-                            const next = priceById(event.target.value);
-                            updateLine(line.key, {
-                              priceId: event.target.value,
-                              rate: next ? String(next.rate) : line.rate,
-                              unit: next?.unit ?? line.unit,
-                              shape: next?.shape ?? defaultShape(line.unit, priceById(line.priceId)?.trade),
-                            });
-                          }}
-                        >
-                          {priceList.map((item) => <option key={item.id} value={item.id}>{locale === "ar" ? item.nameAr : item.nameEn}</option>)}
-                        </select>
-                      </td>
-                      <td data-label={t("col.unit")}>
-                        <select className="select" value={line.unit} onChange={(event) => {
-                          const unit = event.target.value as OfferUnit;
-                          updateLine(line.key, { unit, shape: defaultShape(unit, priceById(line.priceId)?.trade) });
-                        }}>
-                          {offerUnits.map((unit) => <option key={unit} value={unit}>{t(`off.${unit}`)}</option>)}
-                        </select>
-                        {line.unit === "m2" ? (
-                          <select className="select" value={line.shape === "walls" ? "walls" : "area"} onChange={(event) => updateLine(line.key, { shape: event.target.value as MeasureShape })} style={{ marginTop: 6 }}>
-                            <option value="area">{t("off.shapeArea")}</option>
-                            <option value="walls">{t("off.shapeWalls")}</option>
-                          </select>
-                        ) : null}
-                      </td>
-                      <td data-label="L">{line.shape === "count" ? <span className="muted">—</span> : <input className="input num" type="number" min={0} step="0.01" value={line.l} onChange={(event) => updateLine(line.key, { l: event.target.value })} />}</td>
-                      <td data-label="W">{line.shape === "walls" || line.shape === "area" ? <input className="input num" type="number" min={0} step="0.01" value={line.w} onChange={(event) => updateLine(line.key, { w: event.target.value })} /> : <span className="muted">—</span>}</td>
-                      <td data-label="H">{line.shape === "walls" ? <input className="input num" type="number" min={0} step="0.01" value={line.h} onChange={(event) => updateLine(line.key, { h: event.target.value })} /> : <span className="muted">—</span>}</td>
-                      <td data-label={t("col.qty")} className="num strong">
-                        {line.shape === "count" ? (
-                          <input className="input num" type="number" min={0} step="0.1" value={line.qty} onChange={(event) => updateLine(line.key, { qty: event.target.value })} />
-                        ) : <bdi>{formatQty(qty, locale)}</bdi>}
-                      </td>
-                      <td data-label={t("col.rate")}><input className="input num" type="number" min={0} step="0.01" value={line.rate} onChange={(event) => updateLine(line.key, { rate: event.target.value })} /></td>
-                      <td data-label={t("col.total")} className="num end strong"><bdi>{formatQar(amount, locale)}</bdi></td>
-                      <td className="end" data-label="">
-                        <button type="button" className="btn btn--ghost btn--sm" onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}>{t("us.delete")}</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
-              <button
-                type="button"
-                className="link"
-                onClick={() => setLines((current) => [...current, blankLine(filter === "all" ? "paint" : filter)])}
-              >
-                <Icon name="plus" className="icon icon--sm" />
-                {t("off.addM")}
-              </button>
+          {designOnly ? (
+            <DesignRows lines={lines} onChange={updateLine} onAdd={() => setLines((current) => [...current, blankLine("arch-design")])} onRemove={(key) => setLines((current) => current.filter((item) => item.key !== key))} />
+          ) : (
+            <>
+            <div className="hstack">
+              <button type="button" className="chip" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>{t("off.all")}</button>
+              {tradesFor(kind).map((trade) => (
+                <button key={trade} type="button" className="chip" aria-pressed={filter === trade} onClick={() => setFilter(trade)}>{t(`off.${trade}`)}</button>
+              ))}
             </div>
-          </div>
-          <p className="muted">{t("off.ai")}</p>
+            <div className="card card--flush table-wrap">
+              <table className="table table--cards">
+                <thead>
+                  <tr>
+                    <th>{t("col.room")}</th>
+                    <th>{t("col.work")}</th>
+                    <th>{t("col.unit")}</th>
+                    <th>L m</th>
+                    <th>W m</th>
+                    <th>H m</th>
+                    <th>{t("col.qty")}</th>
+                    <th>{t("col.rate")}</th>
+                    <th className="end">{t("col.total")}</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.length === 0 ? <tr><td colSpan={10}>{t("off.emptyLines")}</td></tr> : null}
+                  {visible.map((line) => {
+                    const measuredLine = toLine(line);
+                    const qty = measuredLine ? lineQty(measuredLine) : 0;
+                    const amount = measuredLine ? lineAmount(measuredLine) : 0;
+                    return (
+                      <tr key={line.key}>
+                        <td data-label={t("col.room")}>
+                          <input className="input" placeholder={t("off.roomEn")} value={line.roomEn} onChange={(event) => updateLine(line.key, { roomEn: event.target.value })} />
+                          <input className="input" placeholder={t("off.roomAr")} value={line.roomAr} onChange={(event) => updateLine(line.key, { roomAr: event.target.value })} style={{ marginTop: 6 }} />
+                        </td>
+                        <td data-label={t("col.work")}>
+                          <select
+                            className="select"
+                            value={line.priceId}
+                            onChange={(event) => {
+                              const next = priceById(event.target.value);
+                              updateLine(line.key, {
+                                priceId: event.target.value,
+                                rate: next ? String(next.rate) : line.rate,
+                                unit: next?.unit ?? line.unit,
+                                shape: next?.shape ?? defaultShape(line.unit, priceById(line.priceId)?.trade),
+                              });
+                            }}
+                          >
+                            {priceListFor(kind).map((item) => <option key={item.id} value={item.id}>{locale === "ar" ? item.nameAr : item.nameEn}</option>)}
+                          </select>
+                        </td>
+                        <td data-label={t("col.unit")}>
+                          <select className="select" value={line.unit} onChange={(event) => {
+                            const unit = event.target.value as OfferUnit;
+                            updateLine(line.key, { unit, shape: defaultShape(unit, priceById(line.priceId)?.trade) });
+                          }}>
+                            {offerUnits.map((unit) => <option key={unit} value={unit}>{t(`off.${unit}`)}</option>)}
+                          </select>
+                          {line.unit === "m2" ? (
+                            <select className="select" value={line.shape === "walls" ? "walls" : "area"} onChange={(event) => updateLine(line.key, { shape: event.target.value as MeasureShape })} style={{ marginTop: 6 }}>
+                              <option value="area">{t("off.shapeArea")}</option>
+                              <option value="walls">{t("off.shapeWalls")}</option>
+                            </select>
+                          ) : null}
+                        </td>
+                        <td data-label="L">{line.shape === "count" ? <span className="muted">—</span> : <input className="input num" type="number" min={0} step="0.01" value={line.l} onChange={(event) => updateLine(line.key, { l: event.target.value })} />}</td>
+                        <td data-label="W">{line.shape === "walls" || line.shape === "area" ? <input className="input num" type="number" min={0} step="0.01" value={line.w} onChange={(event) => updateLine(line.key, { w: event.target.value })} /> : <span className="muted">—</span>}</td>
+                        <td data-label="H">{line.shape === "walls" ? <input className="input num" type="number" min={0} step="0.01" value={line.h} onChange={(event) => updateLine(line.key, { h: event.target.value })} /> : <span className="muted">—</span>}</td>
+                        <td data-label={t("col.qty")} className="num strong">
+                          {line.shape === "count" ? (
+                            <input className="input num" type="number" min={0} step="0.1" value={line.qty} onChange={(event) => updateLine(line.key, { qty: event.target.value })} />
+                          ) : <bdi>{formatQty(qty, locale)}</bdi>}
+                        </td>
+                        <td data-label={t("col.rate")}><input className="input num" type="number" min={0} step="0.01" value={line.rate} onChange={(event) => updateLine(line.key, { rate: event.target.value })} /></td>
+                        <td data-label={t("col.total")} className="num end strong"><bdi>{formatQar(amount, locale)}</bdi></td>
+                        <td className="end" data-label="">
+                          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}>{t("us.delete")}</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => setLines((current) => [...current, blankLine(filter === "all" ? "paint" : filter)])}
+                >
+                  <Icon name="plus" className="icon icon--sm" />
+                  {t("off.addM")}
+                </button>
+              </div>
+            </div>
+            </>
+          )}
+          <p className="muted">{t("off.ratesNote")}</p>
           <div className="card stack">
             <div className="between">
               <h3 className="card-title">{t("off.payments")}</h3>
@@ -428,7 +446,7 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
           <h3 className="card-title">{t("off.summary")}</h3>
           <div className="kv"><span>{t("off.client")}</span><b>{locale === "ar" ? clientAr || clientEn : clientEn || clientAr || t("time.none")}</b></div>
           <div className="kv"><span>{t("off.items")}</span><span className="num">{measured.length}</span></div>
-          {packageValue > 0 ? <div className="kv"><span>{t("off.packageAmount")}</span><span className="num"><bdi>{formatQar(packageValue, locale)}</bdi></span></div> : null}
+          {area > 0 ? <div className="kv"><span>{t("off.totalArea")}</span><span className="num"><bdi>{formatQty(area, locale)} m²</bdi></span></div> : null}
           <div className="kv"><span>{t("off.subtotal")}</span><span className="num"><bdi>{formatQar(totals.subtotal, locale)}</bdi></span></div>
           <div className="kv"><span>{t("off.discount")} <bdi className="num">{whole(discountPct, 100) ?? 0}%</bdi></span><span className="num"><bdi>− {formatQar(totals.discount, locale)}</bdi></span></div>
           <div className="total">
@@ -502,16 +520,9 @@ function toPayment(payment: PayDraft): OfferPayment {
   };
 }
 
-function readArea(value: string) {
-  if (value.trim() === "") return { ok: true as const, value: null };
-  const number = Number(value);
-  if (!Number.isInteger(number) || number < 1 || number > 1_000_000) return { ok: false as const, value: null };
-  return { ok: true as const, value: number };
-}
-
 function blankLine(priceId = "paint"): DraftLine {
   const price = priceById(priceId);
-  return { key: crypto.randomUUID(), roomEn: "", roomAr: "", priceId: price?.id ?? "paint", unit: price?.unit ?? "m2", shape: price?.shape ?? "walls", l: "", w: "", h: "", qty: "", rate: String(price?.rate ?? 0) };
+  return { key: crypto.randomUUID(), roomEn: "", roomAr: "", priceId: price?.id ?? "paint", unit: price?.unit ?? "m2", shape: price?.shape ?? "walls", l: "", w: "", h: "", qty: "", rate: String(price?.rate ?? 0), units: "1" };
 }
 
 function toDraft(line: OfferLine): DraftLine {
@@ -527,6 +538,7 @@ function toDraft(line: OfferLine): DraftLine {
     h: line.h === null ? "" : String(line.h),
     qty: String(line.qty),
     rate: String(line.rate),
+    units: String(line.units || 1),
   };
 }
 
@@ -549,7 +561,76 @@ function toLine(line: DraftLine): OfferLine | null {
     unit: line.unit,
     shape: line.shape,
     rate,
+    units: whole(line.units, 999) || 1,
   };
+}
+
+/**
+ * Architectural design pricing: one row per area (e.g. Ground Floor), in m², times the number
+ * of identical units, times the unit price per m². The rows also make the quotation's scope list.
+ */
+function DesignRows({
+  lines,
+  onChange,
+  onAdd,
+  onRemove,
+}: {
+  lines: DraftLine[];
+  onChange: (key: string, patch: Partial<DraftLine>) => void;
+  onAdd: () => void;
+  onRemove: (key: string) => void;
+}) {
+  const t = useTranslations();
+  const locale = useLocale();
+  return (
+    <div className="card card--flush table-wrap">
+      <div className="between" style={{ padding: "16px 18px 4px" }}>
+        <h3 className="card-title">{t("off.areas")}</h3>
+      </div>
+      <table className="table table--cards">
+        <thead>
+          <tr>
+            <th>{t("off.areaName")}</th>
+            <th>{t("off.sqm")}</th>
+            <th>{t("off.units")}</th>
+            <th>{t("off.unitPrice")}</th>
+            <th className="end">{t("col.total")}</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {lines.length === 0 ? <tr><td colSpan={6}>{t("off.noAreas")}</td></tr> : null}
+          {lines.map((line) => {
+            const row = toLine(line);
+            return (
+              <tr key={line.key}>
+                <td data-label={t("off.areaName")}>
+                  <input className="input" placeholder={t("off.areaNameEn")} value={line.roomEn} onChange={(event) => onChange(line.key, { roomEn: event.target.value })} />
+                  <input className="input" dir="rtl" lang="ar" placeholder={t("off.areaNameAr")} value={line.roomAr} onChange={(event) => onChange(line.key, { roomAr: event.target.value })} style={{ marginTop: 6 }} />
+                </td>
+                <td data-label={t("off.sqm")}><input className="input num" type="number" min={0} step="0.1" value={line.qty} onChange={(event) => onChange(line.key, { qty: event.target.value })} /></td>
+                <td data-label={t("off.units")}><input className="input num" type="number" min={1} max={999} step="1" value={line.units} onChange={(event) => onChange(line.key, { units: event.target.value })} /></td>
+                <td data-label={t("off.unitPrice")}><input className="input num" type="number" min={0} step="0.01" value={line.rate} onChange={(event) => onChange(line.key, { rate: event.target.value })} /></td>
+                <td data-label={t("col.total")} className="num end strong">
+                  <bdi>{formatQar(row ? lineAmount(row) : 0, locale)}</bdi>
+                  {row && lineQty(row) > 0 ? <small className="muted" style={{ display: "block" }}><bdi>{formatQty(lineQty(row), locale)} m²</bdi></small> : null}
+                </td>
+                <td className="end" data-label="">
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => onRemove(line.key)}>{t("us.delete")}</button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
+        <button type="button" className="link" onClick={onAdd}>
+          <Icon name="plus" className="icon icon--sm" />
+          {t("off.addArea")}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function optionalNumber(value: string) {

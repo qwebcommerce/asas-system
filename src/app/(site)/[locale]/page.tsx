@@ -7,13 +7,14 @@ import { formText, siteMetadata } from "@/components/site/page-text";
 import { ArrowIcon, DocIcon, LongArrowIcon, PillIcon } from "@/components/site/icons";
 import { Photo, type PhotoName } from "@/components/site/photo";
 import { PostImage } from "@/components/site/post-card";
+import { ProjectImage } from "@/components/site/project-card";
 import { richTags } from "@/components/site/rich";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteEffects } from "@/components/site/site-effects";
 import { SiteHeader } from "@/components/site/site-header";
 import type { Locale } from "@/i18n/routing";
 import { formatBytes } from "@/lib/website";
-import { siteDocuments, sitePosts } from "@/server/site-content";
+import { siteDocuments, siteProjects, sitePosts } from "@/server/site-content";
 
 type Params = { params: Promise<{ locale: string }> };
 
@@ -23,7 +24,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 const SERVICE_PHOTOS: PhotoName[] = ["svc-plans", "svc-construction", "svc-interior", "svc-finishing", "svc-furniture"];
-const PROJECT_PHOTOS: PhotoName[] = ["project-modern-interior", "project-stone-villa", "project-family-lounge", "project-media-wall"];
 const ABOUT_PHOTOS: PhotoName[] = ["about-dining", "about-villa", "about-construction", "about-lounge"];
 
 export default async function HomePage({ params }: Params) {
@@ -38,23 +38,28 @@ export default async function HomePage({ params }: Params) {
   const values = t.raw("values.items") as string[];
   const valuesAlt = t.raw("values.alt") as string[];
   const services = t.raw("services.items") as [string, string, string][];
-  const projects = t.raw("work.projects") as [string, string, string][];
+  const { projects, samples: sampleWork } = await siteProjects(locale, (kind) => t(`work.kinds.${kind}`));
   const aboutAlts = t.raw("about.imgAlts") as string[];
   const reasons = t.raw("why.items") as [string, string][];
   const steps = t.raw("steps.items") as [string, string][];
   const stories = (await sitePosts(locale)).posts.slice(0, 3);
   const docs = (await siteDocuments(locale)).documents.slice(0, 3);
 
-  const project = (i: number) => (
-    <article className="project reveal">
-      <Photo name={PROJECT_PHOTOS[i]} alt={projects[i][2]} sizes="(max-width: 1024px) 100vw, 60vw" />
-      <span className="project__num">P-0{i + 1}</span>
-      <div className="project__caption">
-        <h3 className="project__title">{projects[i][0]}</h3>
-        <p className="project__meta">{projects[i][1]}</p>
-      </div>
-    </article>
-  );
+  // The four newest projects fill the mosaic (fewer published projects leave the remaining slots out)
+  const project = (i: number) => {
+    const item = projects[i];
+    if (!item) return null;
+    return (
+      <Link className="project reveal" href={sitePath(locale, `/our-work/${item.slug}`)}>
+        <ProjectImage cover={item.cover} alt={item.coverAlt} sizes="(max-width: 1024px) 100vw, 60vw" />
+        <span className="project__num">P-0{i + 1}</span>
+        <div className="project__caption">
+          <h3 className="project__title">{item.name}</h3>
+          <p className="project__meta">{item.scope}</p>
+        </div>
+      </Link>
+    );
+  };
 
   const eyebrowAlt = (key: string) => (
     <span className="alt" lang={other}>{t(key)}</span>
@@ -157,14 +162,14 @@ export default async function HomePage({ params }: Params) {
             </div>
             <div className="mosaic">
               <div className="mosaic__row">{project(0)}{project(1)}</div>
-              <div className="mosaic__row">{project(2)}{project(3)}</div>
+              {projects.length > 2 ? <div className="mosaic__row">{project(2)}{project(3)}</div> : null}
             </div>
             <div className="work__foot">
-              <a className="pill pill--light" href="#work">
+              <Link className="pill pill--light" href={sitePath(locale, "/our-work")}>
                 {t("work.all")}
                 <PillIcon />
-              </a>
-              <p className="work__disclosure">{t("work.disclosure")}</p>
+              </Link>
+              {sampleWork ? <p className="work__disclosure">{t("work.disclosure")}</p> : null}
             </div>
           </div>
         </section>

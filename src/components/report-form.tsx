@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
+import { ProjectSelect } from "@/components/project-select";
 import { Icon } from "@/components/icon";
 import { useReports } from "@/components/use-reports";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -62,6 +64,9 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
   const [savedId, setSavedId] = useState(initial?.id ?? "");
   const [pending, setPending] = useState<{ key: string; file: File }[]>([]);
   const [pickKey, setPickKey] = useState(0);
+  // New reports can start from a project page (/reports/new?project=<id>)
+  const startProject = useSearchParams().get("project") ?? "";
+  const [projectId, setProjectId] = useState(initial?.projectId ?? (initial ? "" : startProject));
   const [projectEn, setProjectEn] = useState(initial?.projectEn ?? "");
   const [projectAr, setProjectAr] = useState(initial?.projectAr ?? "");
   const [date, setDate] = useState(initial?.date ?? qatarToday());
@@ -104,6 +109,7 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
     const workerCount = Number(workers);
     const progressCount = Number(progress);
     const input: ReportInput = {
+      projectId,
       projectEn,
       projectAr,
       date,
@@ -180,8 +186,16 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
         }}
       >
         <div className="form-grid">
-          <Field label={t("rep.project")} value={projectEn} onChange={setProjectEn} />
-          <Field label={t("rep.projectAr")} value={projectAr} onChange={setProjectAr} />
+          <ProjectSelect
+            id="report-project"
+            required
+            value={projectId}
+            onChange={(id, project) => {
+              setProjectId(id);
+              setProjectEn(project?.nameEn ?? "");
+              setProjectAr(project?.nameAr ?? "");
+            }}
+          />
           <Field label={t("rep.date")} value={date} onChange={setDate} type="date" />
         </div>
         <div className="form-grid">

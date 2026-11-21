@@ -28,12 +28,14 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const who = await actor(text(form.get("token")));
     if ("error" in who) return Response.json({ ok: false, error: who.error });
-    if (!canWriteModule(who.level("website"))) return Response.json({ ok: false, error: "web.forbidden" });
-
     const purpose = text(form.get("purpose"));
+    // "cover": blog post cover (Website permission); "project": project cover (Projects permission)
+    const area = purpose === "project" ? "projects" : "website";
+    if (!canWriteModule(who.level(area))) return Response.json({ ok: false, error: area === "projects" ? "prj.forbidden" : "web.forbidden" });
+
     const id = text(form.get("id"));
     const file = form.get("file");
-    if (purpose !== "cover" || !id || !(file instanceof File)) {
+    if ((purpose !== "cover" && purpose !== "project") || !id || !(file instanceof File)) {
       return Response.json({ ok: false, error: "us.invalid" });
     }
 
@@ -44,16 +46,17 @@ export async function POST(request: Request) {
     const bytes = Buffer.from(await file.arrayBuffer());
     if (!signatureMatches(type, bytes)) return Response.json({ ok: false, error: "web.imageOnly" });
 
-    const ref = adminDb().collection("blogPosts").doc(id);
+    const ref = adminDb().collection(purpose === "project" ? "projects" : "blogPosts").doc(id);
     const snap = await ref.get();
     if (!snap.exists) return Response.json({ ok: false, error: "us.invalid" });
 
     const previous = typeof snap.data()?.coverPath === "string" ? (snap.data()?.coverPath as string) : "";
-    const path = await savePrivateFile(`website/covers/${id}`, type, bytes);
+    const path = await savePrivateFile(`website/${purpose === "project" ? "projects" : "covers"}/${id}`, type, bytes);
     await ref.update({ coverPath: path, coverType: type });
     if (previous) await removePrivateFile(previous);
     await audit(`website.${purpose}.upload`, who.uid, id, type);
-    revalidateTag("website", "max");
+    // Expire immediately so the next visit shows the new cover (and a project published with it)
+    revalidateTag("website", { expire: 0 });
     return Response.json({ ok: true, id });
   } catch {
     return Response.json({ ok: false, error: "auth.failed" });

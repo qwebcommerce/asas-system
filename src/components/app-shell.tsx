@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAuth } from "@/components/auth-provider";
+import { AsasLogo } from "@/components/asas-logo";
 import { Icon } from "@/components/icon";
 import { LanguageSwitch } from "@/components/language-switch";
 import { ThemeToggle } from "@/components/theme";
@@ -14,6 +15,7 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 
 const workspace = [
   { id: "overview", href: "/overview", icon: "grid" },
+  { id: "projects", href: "/projects", icon: "home" },
   { id: "users", href: "/users", icon: "users" },
   { id: "hr", href: "/hr", icon: "brief" },
   { id: "reports", href: "/reports", icon: "report" },
@@ -59,13 +61,7 @@ export function AppShell({
       <div className="app">
         <aside className={`sidebar${menuOpen ? " is-open" : ""}`} id="sidebar" aria-label="Main">
           <div className="brand">
-            <svg aria-hidden="true">
-              <use href="#i-logo" />
-            </svg>
-            <div>
-              <b>ASAS</b>
-              <small>{t("brand.execution")}</small>
-            </div>
+            <AsasLogo className="brand-logo" title="ASAS EXECUTION" />
           </div>
           <div className="nav-label">{t("nav.workspace")}</div>
           <nav>

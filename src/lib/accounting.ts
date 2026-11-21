@@ -16,6 +16,8 @@ export type Invoice = {
   number: string;
   clientEn: string;
   clientAr: string;
+  /** Linked project ("" if none); projectEn/projectAr are copied from it. */
+  projectId: string;
   projectEn: string;
   projectAr: string;
   contract: number;
@@ -34,6 +36,8 @@ export type Bill = {
   supplierEn: string;
   supplierAr: string;
   category: BillCategory;
+  /** Linked project, or "" for costs not related to a project (office, rent…). */
+  projectId: string;
   projectEn: string;
   projectAr: string;
   reference: string;
@@ -75,6 +79,7 @@ export type Expense = {
   vendorEn: string;
   vendorAr: string;
   category: BillCategory;
+  projectId: string;
   projectEn: string;
   projectAr: string;
   reference: string;
@@ -86,6 +91,36 @@ export type Expense = {
 };
 
 export type ExpenseInput = Omit<Expense, "id">;
+
+export const receiptMethods = ["transfer", "cheque", "cash", "card"] as const;
+export type ReceiptMethod = (typeof receiptMethods)[number];
+
+/** Money received from a client, optionally against an invoice. */
+export type Receipt = {
+  id: string;
+  number: string;
+  projectId: string;
+  projectEn: string;
+  projectAr: string;
+  payerEn: string;
+  payerAr: string;
+  amount: number;
+  receivedOn: string;
+  method: ReceiptMethod;
+  reference: string;
+  invoiceId: string;
+  note: string;
+};
+
+export type ReceiptInput = Omit<Receipt, "id" | "number">;
+
+export function receiptProblem(input: ReceiptInput) {
+  if (!named(input.payerEn, input.payerAr)) return "fin.needNames";
+  if (!dated(input.receivedOn)) return "fin.needDates";
+  if (!whole(input.amount) || input.amount < 1) return "fin.needAmount";
+  if (!receiptMethods.includes(input.method)) return "fin.needMethod";
+  return null;
+}
 
 export type LedgerLine = {
   id: string;
@@ -125,15 +160,15 @@ export function invoiceProblem(input: InvoiceInput) {
   return null;
 }
 
-function categoryProblem(category: BillCategory, projectEn: string, projectAr: string) {
+function categoryProblem(category: BillCategory, projectId: string, projectEn: string, projectAr: string) {
   if (!billCategories.includes(category)) return "fin.needCategory";
-  if (category === "project" && !named(projectEn, projectAr)) return "fin.needProject";
+  if (category === "project" && !projectId && !named(projectEn, projectAr)) return "fin.needProject";
   return null;
 }
 
 export function billProblem(input: BillInput) {
   if (!named(input.supplierEn, input.supplierAr)) return "fin.needNames";
-  const category = categoryProblem(input.category, input.projectEn, input.projectAr);
+  const category = categoryProblem(input.category, input.projectId, input.projectEn, input.projectAr);
   if (category) return category;
   if (!dated(input.issuedOn) || !dated(input.dueOn)) return "fin.needDates";
   if (!whole(input.amount) || input.amount < 1 || !whole(input.paid)) return "fin.needAmount";
@@ -143,7 +178,7 @@ export function billProblem(input: BillInput) {
 
 export function expenseProblem(input: ExpenseInput) {
   if (!named(input.vendorEn, input.vendorAr)) return "fin.needNames";
-  const category = categoryProblem(input.category, input.projectEn, input.projectAr);
+  const category = categoryProblem(input.category, input.projectId, input.projectEn, input.projectAr);
   if (category) return category;
   if (!dated(input.spentOn) || !dated(input.dueOn)) return "fin.needDates";
   if (!whole(input.amount) || input.amount < 1 || !whole(input.paid)) return "fin.needAmount";
@@ -271,6 +306,7 @@ export function mapInvoice(id: string, data: Record<string, unknown>): Invoice |
     number: text(data.number),
     clientEn: text(data.clientEn),
     clientAr: text(data.clientAr),
+    projectId: text(data.projectId),
     projectEn: text(data.projectEn),
     projectAr: text(data.projectAr),
     contract,
@@ -294,6 +330,7 @@ export function mapBill(id: string, data: Record<string, unknown>): Bill | null 
     supplierEn: text(data.supplierEn),
     supplierAr: text(data.supplierAr),
     category: billCategory(data.category),
+    projectId: text(data.projectId),
     projectEn: text(data.projectEn),
     projectAr: text(data.projectAr),
     reference: text(data.reference),
@@ -336,6 +373,7 @@ export function mapExpense(id: string, data: Record<string, unknown>): Expense |
     vendorEn: text(data.vendorEn),
     vendorAr: text(data.vendorAr),
     category: billCategory(data.category),
+    projectId: text(data.projectId),
     projectEn: text(data.projectEn),
     projectAr: text(data.projectAr),
     reference: text(data.reference),
@@ -344,5 +382,27 @@ export function mapExpense(id: string, data: Record<string, unknown>): Expense |
     dueOn,
     amount,
     paid,
+  };
+}
+
+export function mapReceipt(id: string, data: Record<string, unknown>): Receipt | null {
+  const amount = qar(data.amount);
+  const receivedOn = day(data.receivedOn);
+  const method = receiptMethods.find((item) => item === data.method);
+  if (amount === null || amount < 1 || !receivedOn || !method || !text(data.payerEn) || !text(data.number)) return null;
+  return {
+    id,
+    number: text(data.number),
+    projectId: text(data.projectId),
+    projectEn: text(data.projectEn),
+    projectAr: text(data.projectAr),
+    payerEn: text(data.payerEn),
+    payerAr: text(data.payerAr),
+    amount,
+    receivedOn,
+    method,
+    reference: text(data.reference),
+    invoiceId: text(data.invoiceId),
+    note: text(data.note),
   };
 }

@@ -1,7 +1,11 @@
 export const offerStatuses = ["draft", "sent", "accepted", "rejected", "expired"] as const;
-export const offerTrades = ["paint", "gyp", "floor", "kitchen"] as const;
+export const offerTrades = ["paint", "gyp", "floor", "kitchen", "design"] as const;
 export const offerUnits = ["m2", "lm", "pcs", "set"] as const;
-export const measureShapes = ["walls", "area", "length", "count"] as const;
+/**
+ * How a row's quantity is measured: wall area 2(L+W)×H, floor area L×W, a length,
+ * a count, or "direct" (the quantity is typed in, e.g. an architecture area in m²).
+ */
+export const measureShapes = ["walls", "area", "length", "count", "direct"] as const;
 /** Offer types, in the order they are offered when creating an offer. */
 export const offerKinds = ["architecture", "fitout", "interior", "construction"] as const;
 
@@ -64,7 +68,12 @@ export type PriceItem = {
   rate: number;
 };
 
+/**
+ * Price list. PLACEHOLDER RATES: the real measurement and price lists per offer type
+ * will replace these.
+ */
 export const priceList: PriceItem[] = [
+  { id: "arch-design", trade: "design", nameEn: "Architectural design", nameAr: "تصميم معماري", unit: "m2", shape: "direct", rate: 40 },
   { id: "paint", trade: "paint", nameEn: "Painting", nameAr: "دهان", unit: "m2", shape: "walls", rate: 28 },
   { id: "gyp", trade: "gyp", nameEn: "Gypsum ceiling", nameAr: "سقف جبس", unit: "m2", shape: "area", rate: 95 },
   { id: "floor", trade: "floor", nameEn: "Porcelain flooring", nameAr: "أرضية بورسلان", unit: "m2", shape: "area", rate: 165 },
@@ -85,6 +94,8 @@ export type OfferLine = {
   unit: OfferUnit;
   shape: MeasureShape;
   rate: number;
+  /** How many identical units the row covers (e.g. 2 identical floors). */
+  units: number;
 };
 
 export type Offer = {
@@ -102,10 +113,9 @@ export type Offer = {
   projectAr: string;
   reference: string;
   kind: OfferKind;
+  /** Project this offer belongs to ("" when not linked yet). */
+  projectId: string;
   issuedOn: string;
-  areaFrom: number | null;
-  areaTo: number | null;
-  packageAmount: number;
   scopeEn: string;
   scopeAr: string;
   stages: OfferStage[];
@@ -137,6 +147,16 @@ export function architectureStages(): OfferStage[] {
   ];
 }
 
+/** Price items offered for a type of offer. */
+export function priceListFor(kind: OfferKind) {
+  return priceList.filter((item) => (kind === "architecture" ? item.trade === "design" : item.trade !== "design"));
+}
+
+/** Trades shown as filters in the measurement table for a type of offer. */
+export function tradesFor(kind: OfferKind) {
+  return offerTrades.filter((trade) => (kind === "architecture" ? trade === "design" : trade !== "design"));
+}
+
 export function priceById(id: string) {
   return priceList.find((item) => item.id === id) ?? null;
 }
@@ -148,6 +168,7 @@ export function defaultShape(unit: OfferUnit, trade?: OfferTrade): MeasureShape 
 }
 
 export function inferShape(unit: OfferUnit, trade: OfferTrade | undefined, h: number | null, stored: unknown): MeasureShape {
+  if (stored === "direct") return "direct";
   if (unit === "pcs" || unit === "set") return "count";
   if (unit === "lm") return "length";
   if (stored === "walls" || stored === "area") return stored;
@@ -162,15 +183,25 @@ export function measureQty(shape: MeasureShape, l: number | null, w: number | nu
   if (shape === "walls") return length > 0 && width > 0 && height > 0 ? round1(2 * (length + width) * height) : 0;
   if (shape === "area") return length > 0 && width > 0 ? round1(length * width) : 0;
   if (shape === "length") return round1(length);
-  return round1(qty);
+  return round1(qty); // count and direct
 }
 
-export function lineAmount(line: Pick<OfferLine, "shape" | "l" | "w" | "h" | "qty" | "rate">) {
-  return Math.round(measureQty(line.shape, line.l, line.w, line.h, line.qty) * line.rate);
+export function lineQty(line: Pick<OfferLine, "shape" | "l" | "w" | "h" | "qty" | "units">) {
+  return round1(measureQty(line.shape, line.l, line.w, line.h, line.qty) * Math.max(1, line.units || 1));
 }
 
-export function offerTotals(lines: OfferLine[], discountPct: number, packageAmount = 0) {
-  const subtotal = lines.reduce((sum, line) => sum + lineAmount(line), 0) + Math.max(0, packageAmount);
+export function lineAmount(line: Pick<OfferLine, "shape" | "l" | "w" | "h" | "qty" | "rate" | "units">) {
+  return Math.round(lineQty(line) * line.rate);
+}
+
+/** Total built area of an architecture offer (m² × units over its rows). */
+export function totalArea(lines: OfferLine[]) {
+  return round1(lines.filter((line) => line.unit === "m2").reduce((sum, line) => sum + lineQty(line), 0));
+}
+
+/** The offer total is always calculated from its measured rows. */
+export function offerTotals(lines: OfferLine[], discountPct: number) {
+  const subtotal = lines.reduce((sum, line) => sum + lineAmount(line), 0);
   const discount = Math.round(subtotal * discountPct / 100);
   return { subtotal, discount, total: subtotal - discount };
 }
@@ -182,17 +213,11 @@ export function paymentAmounts(total: number, payments: { percent: number }[]) {
   return amounts;
 }
 
-function validArea(value: number | null) {
-  return value === null || (Number.isInteger(value) && value >= 1 && value <= 1_000_000);
-}
-
 export function offerProblem(input: OfferInput) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.issuedOn)) return "off.needDate";
   if (input.phone && !/^[0-9+\s()-]{6,20}$/.test(input.phone)) return "off.needPhone";
   if (input.clientId && !/^[0-9]{5,20}$/.test(input.clientId)) return "off.needId";
-  if (!validArea(input.areaFrom) || !validArea(input.areaTo)) return "off.needArea";
-  if (input.areaFrom !== null && input.areaTo !== null && input.areaFrom > input.areaTo) return "off.needArea";
-  if (!Number.isInteger(input.packageAmount) || input.packageAmount < 0 || input.packageAmount > 100_000_000) return "off.needPackage";
+  if (input.lines.some((line) => !Number.isInteger(line.units) || line.units < 1 || line.units > 999)) return "off.needUnits";
   if (input.stages.some((stage) => !stage.titleEn.trim() || !stage.titleAr.trim())) return "off.needStage";
   if (input.payments.length < 1 || input.payments.length > 6) return "off.needPay";
   if (input.payments.some((payment) => !payment.labelEn.trim() || !payment.labelAr.trim() || !payment.whenEn.trim() || !payment.whenAr.trim())) return "off.needPay";
@@ -257,6 +282,7 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
       unit,
       shape: inferShape(unit, trade, dim(row.h), row.shape),
       rate,
+      units: typeof row.units === "number" && Number.isInteger(row.units) && row.units >= 1 ? row.units : 1,
     }];
   }) : [];
   return {
@@ -274,10 +300,8 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
     projectAr: text(data.projectAr),
     reference: text(data.reference),
     kind: storedKind(data.kind),
+    projectId: text(data.projectId),
     issuedOn: /^\d{4}-\d{2}-\d{2}$/.test(text(data.issuedOn)) ? text(data.issuedOn) : "",
-    areaFrom: area(data.areaFrom),
-    areaTo: area(data.areaTo),
-    packageAmount: money(data.packageAmount),
     scopeEn: text(data.scopeEn),
     scopeAr: text(data.scopeAr),
     stages: mapStages(data.stages),
@@ -287,14 +311,6 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
     validUntil: /^\d{4}-\d{2}-\d{2}$/.test(text(data.validUntil)) ? text(data.validUntil) : "",
     lines,
   };
-}
-
-function area(value: unknown) {
-  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 1_000_000 ? value : null;
-}
-
-function money(value: unknown) {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 100_000_000 ? value : 0;
 }
 
 function mapStages(value: unknown): OfferStage[] {
