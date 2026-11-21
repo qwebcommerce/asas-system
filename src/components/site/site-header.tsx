@@ -6,25 +6,32 @@ import { PhoneIcon, PillIcon } from "./icons";
 import { MobileNav } from "./mobile-nav";
 import { Logo } from "./photo";
 
-export type SitePage = "home" | "work" | "blogs" | "documents";
+export type SitePage = "home" | "about" | "services" | "work" | "contact" | "blogs" | "documents";
 
-/** Path of each page without the locale, used for the language switch. */
-export const PAGE_PATH: Record<SitePage, string> = { home: "", work: "/our-work", blogs: "/blogs", documents: "/resources" };
+/** Path of each page without the locale, used for links and the language switch. */
+export const PAGE_PATH: Record<SitePage, string> = {
+  home: "",
+  about: "/about",
+  services: "/services",
+  work: "/our-work",
+  contact: "/contact",
+  blogs: "/blogs",
+  documents: "/resources",
+};
+
+/** Menu order, as in the design. */
+const MENU: SitePage[] = ["home", "about", "services", "work", "blogs", "documents", "contact"];
+
+/** "Book a consultation" goes to the form on the Contact page. */
+export function consultationHref(locale: Locale) {
+  return sitePath(locale, PAGE_PATH.contact, "consultation");
+}
 
 export async function SiteHeader({ locale, current, path }: { locale: Locale; current: SitePage; path?: string }) {
   const t = await getTranslations({ locale, namespace: "site" });
-  const home = (hash: string) => sitePath(locale, "", hash);
   const other = otherLocale(locale);
   const otherHref = sitePath(other, path ?? PAGE_PATH[current]);
-  const drawerLinks = [
-    { href: sitePath(locale), label: t("nav.home"), current: current === "home" },
-    { href: home("about"), label: t("nav.about"), current: false },
-    { href: home("services"), label: t("nav.services"), current: false },
-    { href: sitePath(locale, "/our-work"), label: t("nav.work"), current: current === "work" },
-    { href: sitePath(locale, "/blogs"), label: t("nav.blogs"), current: current === "blogs" },
-    { href: sitePath(locale, "/resources"), label: t("nav.documents"), current: current === "documents" },
-    { href: home("contact"), label: t("nav.contact"), current: false },
-  ];
+  const links = MENU.map((page) => ({ href: sitePath(locale, PAGE_PATH[page]), label: t(`nav.${page}`), current: current === page }));
 
   return (
     <header className="site-header">
@@ -34,13 +41,9 @@ export async function SiteHeader({ locale, current, path }: { locale: Locale; cu
             <Logo alt={t("logoAlt")} />
           </Link>
           <div className="nav__links">
-            <Link href={sitePath(locale)} aria-current={current === "home" ? "page" : undefined}>{t("nav.home")}</Link>
-            <Link href={home("about")}>{t("nav.about")}</Link>
-            <Link href={home("services")}>{t("nav.services")}</Link>
-            <Link href={sitePath(locale, "/our-work")} aria-current={current === "work" ? "page" : undefined}>{t("nav.work")}</Link>
-            <Link href={sitePath(locale, "/blogs")} aria-current={current === "blogs" ? "page" : undefined}>{t("nav.blogs")}</Link>
-            <Link href={sitePath(locale, "/resources")} aria-current={current === "documents" ? "page" : undefined}>{t("nav.documents")}</Link>
-            <Link href={home("contact")}>{t("nav.contact")}</Link>
+            {links.map((link) => (
+              <Link key={link.href} href={link.href} aria-current={link.current ? "page" : undefined}>{link.label}</Link>
+            ))}
           </div>
         </nav>
         <div className="header-actions">
@@ -55,15 +58,15 @@ export async function SiteHeader({ locale, current, path }: { locale: Locale; cu
             <PhoneIcon />
             {t("phone")}
           </a>
-          <Link className="pill pill--dark" href={home("contact")}>
+          <Link className="pill pill--dark" href={consultationHref(locale)}>
             {t("book")}
             <PillIcon />
           </Link>
           <MobileNav
-            links={drawerLinks}
+            links={links}
             language={{ current: t("lang.current"), other: t("lang.other"), otherHref, otherLang: other }}
             phone={{ href: SITE_PHONE_HREF, label: t("phone") }}
-            cta={{ href: home("contact"), label: t("book") }}
+            cta={{ href: consultationHref(locale), label: t("book") }}
             labels={{ open: t("nav.openMenu"), close: t("nav.closeMenu"), menu: t("nav.menu"), language: t("nav.language") }}
           />
         </div>

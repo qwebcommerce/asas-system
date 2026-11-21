@@ -3,7 +3,7 @@ import { adminDb, isAdminConfigured } from "@/lib/firebase-admin";
 import { mapBlogPost, mapSiteDocument, pick, type BlogCategory, type SiteDocCategory } from "@/lib/website";
 import type { OfferKind } from "@/lib/offers";
 import { mapProject } from "@/lib/projects";
-import { sampleDocuments, sampleProjects, samplePosts, type SamplePhoto, type SampleProjectPhoto } from "@/lib/website-samples";
+import { sampleDocuments, sampleProjects, samplePosts, type SamplePhoto, type SampleProjectPhoto, type SampleProjectThumb } from "@/lib/website-samples";
 
 /*
  * Content for the public website pages.
@@ -166,19 +166,24 @@ export async function siteDocuments(locale: string): Promise<{ documents: Docume
 
 // ---------------------------------------------------------------- projects
 
-export type ProjectCover = { kind: "sample"; photo: SampleProjectPhoto } | { kind: "stored"; src: string };
+export type ProjectCover = { kind: "sample"; photo: SampleProjectPhoto | SampleProjectThumb } | { kind: "stored"; src: string };
 
 /** Public view of a project. Client details, budget and notes are never included. */
 export type ProjectView = {
   slug: string;
   name: string;
   kind: OfferKind;
+  /** Small label above the name (type of work) */
   scope: string;
+  /** Line under the name (disciplines, or location and year) */
+  meta: string;
   location: string;
   summary: string;
   year: string;
   cover: ProjectCover;
   coverAlt: string;
+  /** Extra photos (the samples have two; published projects have none yet) */
+  thumbs: ProjectCover[];
 };
 
 type PublicProject = {
@@ -235,11 +240,13 @@ export async function siteProjects(locale: string, kindLabel: (kind: OfferKind) 
         name: pick(project.nameEn, project.nameAr, locale),
         kind: project.kind,
         scope: kindLabel(project.kind),
+        meta: [pick(project.locationEn, project.locationAr, locale), project.year].filter(Boolean).join(" · "),
         location: pick(project.locationEn, project.locationAr, locale),
         summary: pick(project.summaryEn, project.summaryAr, locale),
         year: project.year,
         cover: { kind: "stored", src: `/api/site-files/project/${project.id}` },
         coverAlt: pick(project.nameEn, project.nameAr, locale),
+        thumbs: [],
       })),
     };
   }
@@ -250,11 +257,13 @@ export async function siteProjects(locale: string, kindLabel: (kind: OfferKind) 
       name: pick(project.nameEn, project.nameAr, locale),
       kind: project.kind,
       scope: pick(project.scopeEn, project.scopeAr, locale),
+      meta: pick(project.metaEn, project.metaAr, locale),
       location: pick(project.locationEn, project.locationAr, locale),
       summary: pick(project.summaryEn, project.summaryAr, locale),
       year: project.year,
       cover: { kind: "sample", photo: project.photo },
       coverAlt: pick(project.altEn, project.altAr, locale),
+      thumbs: project.thumbs.map((photo) => ({ kind: "sample" as const, photo })),
     })),
   };
 }

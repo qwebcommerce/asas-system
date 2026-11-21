@@ -6,6 +6,7 @@ import { PillIcon } from "@/components/site/icons";
 import { siteMetadata } from "@/components/site/page-text";
 import { Logo } from "@/components/site/photo";
 import { richTags } from "@/components/site/rich";
+import { PageHero } from "@/components/site/sections";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteEffects } from "@/components/site/site-effects";
 import { SiteHeader } from "@/components/site/site-header";
@@ -32,22 +33,25 @@ export default async function ResourcesPage({ params }: Params) {
     <>
       <SiteHeader locale={locale} current="documents" />
       <main>
-        {/* Resource hero */}
-        <section className="page-hero docs-hero">
-          <div className="docs-hero__inner">
-            <p className="label">{t("docs.label")}</p>
-            <h1 className="display">{t.rich("docs.title", richTags)}</h1>
-            <p className="docs-hero__intro">{t("docs.intro")}</p>
-            <p className="docs-hero__note">{t("docs.note")}</p>
-            <div className="cover" aria-hidden="true">
+        <PageHero
+          locale={locale}
+          className="docs-hero"
+          label={t("docs.label")}
+          lines={t.raw("docs.lines") as string[]}
+          alt={t("docs.alt")}
+          intro={t("docs.intro")}
+          aside={
+            <div className="cover-card" aria-hidden="true">
               <span className="logo"><Logo alt="" /></span>
-              <p className="cover__eyebrow">{t("docs.coverEyebrow")}</p>
+              <p className="cover-card__eyebrow">{t("docs.coverEyebrow")}</p>
               <h2 className="display">{t.rich("docs.coverTitle", richTags)}</h2>
               <hr />
-              <p className="cover__foot">{t.rich("docs.coverFoot", richTags)}</p>
+              <p className="cover-card__foot">{t.rich("docs.coverFoot", richTags)}</p>
             </div>
-          </div>
-        </section>
+          }
+        >
+          <p className="label label--light" style={{ marginTop: 40, fontSize: 12 }}>{t("docs.note")}</p>
+        </PageHero>
 
         {/* Library */}
         <section className="library">
@@ -104,7 +108,7 @@ export default async function ResourcesPage({ params }: Params) {
 
         {/* Support */}
         <section className="support">
-          <div className="wrap">
+          <div className="wrap reveal">
             <div>
               <h2 className="display">{t.rich("docs.supportTitle", richTags)}</h2>
               <p>{t("docs.supportText")}</p>

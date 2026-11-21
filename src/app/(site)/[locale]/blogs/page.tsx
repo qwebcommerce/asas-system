@@ -2,14 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { sitePath } from "@/components/site/content";
-import { FilterButtons } from "@/components/site/filter-buttons";
+import { FilteredGrid } from "@/components/site/filtered-grid";
 import { PillIcon } from "@/components/site/icons";
 import { siteMetadata } from "@/components/site/page-text";
-import { Photo } from "@/components/site/photo";
 import { PostCard, PostImage } from "@/components/site/post-card";
-import { richTags } from "@/components/site/rich";
-import { SiteFooter } from "@/components/site/site-footer";
+import { CtaBand, PageHero } from "@/components/site/sections";
 import { SiteEffects } from "@/components/site/site-effects";
+import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import type { Locale } from "@/i18n/routing";
 import { blogCategories } from "@/lib/website";
@@ -31,33 +30,33 @@ export default async function BlogsPage({ params }: Params) {
   const featured = featuredPost(posts);
   const rest = posts.filter((post) => post !== featured);
   const categories = blogCategories.filter((cat) => rest.some((post) => post.category === cat));
-  const contact = sitePath(locale, "", "contact");
 
   return (
     <>
       <SiteHeader locale={locale} current="blogs" />
       <main>
-        {/* Journal hero */}
-        <section className="page-hero journal-hero">
-          <div className="journal-hero__copy">
-            <p className="label">{t("blogs.label")}</p>
-            <h1 className="display">{t.rich("blogs.title", richTags)}</h1>
-            <p className="journal-hero__intro">{t("blogs.intro")}</p>
-          </div>
-          <figure className="journal-hero__photo" style={{ margin: 0 }}>
-            <Photo name="journal-hero" alt={t("blogs.heroAlt")} sizes="(max-width: 1024px) 100vw, 600px" eager />
-            <figcaption className="journal-hero__note">{t("blogs.heroNote")}</figcaption>
-          </figure>
-        </section>
+        <PageHero
+          locale={locale}
+          label={t("blogs.label")}
+          lines={t.raw("blogs.lines") as string[]}
+          alt={t("blogs.alt")}
+          intro={t("blogs.intro")}
+          photo="journal-hero"
+          photoAlt={t("blogs.heroAlt")}
+          photoAltMotion
+          note={t("blogs.heroNote")}
+        />
 
-        {/* Featured story */}
+        {/* Editor's pick */}
         {featured ? (
           <section className="featured">
             <div className="wrap featured__grid">
-              <Link className="featured__photo reveal" href={sitePath(locale, `/blogs/${featured.slug}`)} tabIndex={-1} aria-hidden="true">
-                <PostImage cover={featured.cover} alt={featured.coverAlt} sizes="(max-width: 1024px) 100vw, 60vw" />
+              <Link className="reveal" href={sitePath(locale, `/blogs/${featured.slug}`)} tabIndex={-1} aria-hidden="true">
+                <span className="photo kb featured__photo">
+                  <PostImage cover={featured.cover} alt={featured.coverAlt} sizes="(max-width: 1280px) 100vw, 750px" />
+                </span>
               </Link>
-              <div className="featured__text reveal">
+              <div className="reveal">
                 <p className="label">{t("blogs.editorsPick")} &nbsp;/&nbsp; {t(`blogs.filters.${featured.category}`)}</p>
                 <h2 className="display">{featured.title}</h2>
                 <p className="featured__desc">{featured.excerpt}</p>
@@ -71,47 +70,38 @@ export default async function BlogsPage({ params }: Params) {
           </section>
         ) : null}
 
-        {/* Article collection (hidden while the featured story is the only one) */}
+        {/* All other stories (hidden while the featured story is the only one) */}
         {rest.length > 0 ? (
-        <section className="collection" id="stories">
-          <div className="wrap">
-            <h2 className="display reveal">{t("blogs.collection")}</h2>
-            {categories.length > 1 ? (
-              <FilterButtons
-                scope=".articles"
-                buttonClass="filter"
-                label={t("blogs.filterLabel")}
-                options={(["all", ...categories] as const).map((key) => ({ key, label: t(`blogs.filters.${key}`) }))}
+          <section className="collection" id="collection">
+            <div className="wrap">
+              <h2 className="display reveal">{t("blogs.collection")}</h2>
+              <FilteredGrid
+                gridClass="articles"
+                pageSize={6}
+                filterLabel={t("blogs.filterLabel")}
+                pagesLabel={t("pages.label")}
+                nextLabel={t("pages.next")}
+                previousLabel={t("pages.previous")}
+                filters={(["all", ...categories] as const).map((key) => ({ key, label: t(`blogs.filters.${key}`) }))}
+                items={rest.map((post, i) => ({
+                  key: post.slug,
+                  cat: post.category,
+                  node: (
+                    <PostCard
+                      post={post}
+                      locale={locale}
+                      categoryLabel={t(`blogs.filters.${post.category}`)}
+                      minutesLabel={t("blogs.minRead", { n: post.readMinutes })}
+                      photoClass={`photo kb${i % 2 ? "" : " kb--alt"} article__photo`}
+                    />
+                  ),
+                }))}
               />
-            ) : null}
-            <div className="articles">
-              {rest.map((post) => (
-                <PostCard
-                  key={post.slug}
-                  post={post}
-                  locale={locale}
-                  categoryLabel={t(`blogs.filters.${post.category}`)}
-                  minutesLabel={t("blogs.minRead", { n: post.readMinutes })}
-                />
-              ))}
             </div>
-          </div>
-        </section>
+          </section>
         ) : null}
 
-        {/* CTA */}
-        <section className="cta-band">
-          <div className="wrap">
-            <div>
-              <h2 className="display">{t("blogs.ctaTitle")}</h2>
-              <p>{t("blogs.ctaText")}</p>
-            </div>
-            <Link className="pill pill--light" href={contact}>
-              {t("book")}
-              <PillIcon />
-            </Link>
-          </div>
-        </section>
+        <CtaBand locale={locale} title={t("blogs.ctaTitle")} text={t("blogs.ctaText")} button={t("book")} />
       </main>
       <SiteFooter locale={locale} current="blogs" />
       <SiteEffects />
