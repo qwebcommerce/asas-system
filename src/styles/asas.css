@@ -1080,3 +1080,7 @@ img, svg { display: block; max-width: 100%; }
 .wk-risks, .wk-note { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg, #F6EEDD); font-size: 14px; }
 .wk-note { background: var(--danger-bg, #F6E6E4); }
 @media (max-width: 720px) { .wk-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Company mailbox card (Settings) */
+.mail-result { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); font-size: 13.5px; }
+.mail-result--ok { background: var(--ok-bg, #E8F1EB); color: var(--ok, #3F7A57); }

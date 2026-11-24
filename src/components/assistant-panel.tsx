@@ -19,8 +19,12 @@ type Bubble = { from: "me" | "ai" | "note"; text: string; reportId?: string };
 export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useTranslations();
   const locale = useLocale();
-  const { getToken } = useAuth();
-  const { canManage, ready } = useReports();
+  const { getToken, profile } = useAuth();
+  const { canManage: canReport, ready } = useReports();
+  // Super Admins can also ask about the company mailbox (connected in Settings)
+  const canMail = profile?.role === "superAdmin";
+  const canManage = canReport || canMail;
+  const chips = [...(canMail ? (["e1", "e2", "e3"] as const) : []), ...(canReport ? (["s1"] as const) : [])];
   const [history, setHistory] = useState<History>([]);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [draft, setDraft] = useState<AssistantDraft | null>(null);
@@ -111,9 +115,9 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
         {ready && !canManage ? <p className="ai-bubble ai-bubble--ai">{t("ai.noAccess")}</p> : null}
         {canManage && bubbles.length === 0 ? (
           <>
-            <p className="ai-bubble ai-bubble--ai">{t("ai.welcome")}</p>
+            <p className="ai-bubble ai-bubble--ai">{t(canMail && canReport ? "ai.welcomeBoth" : canMail ? "ai.welcomeMail" : "ai.welcome")}</p>
             <div className="ai-panel__chips">
-              {(["s1", "s2", "s3"] as const).map((id) => (
+              {chips.map((id) => (
                 <button key={id} type="button" className="chip ai-chip" onClick={() => void send(t(`ai.${id}`))}>{t(`ai.${id}`)}</button>
               ))}
             </div>

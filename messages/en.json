@@ -37,10 +37,8 @@
   "act3t": "1 h ago",
   "ai": {
     "ask": "Type your answer…",
-    "note": "The assistant prepares the report. Nothing is saved until you press Submit.",
+    "note": "The assistant only reads and prepares. It never sends email, and nothing is saved until you press Submit.",
     "s1": "File today's daily report",
-    "s2": "Report for my last project",
-    "s3": "What do you need from me for a report?",
     "title": "ASAS Assistant",
     "welcome": "Hi! I can fill in today's daily report with you. Tell me the project, or tap a suggestion.",
     "noAccess": "You need access to Project reports to file reports with the assistant. Ask a Super Admin.",
@@ -56,7 +54,12 @@
     "change": "Change something",
     "submit": "Submit report",
     "newChat": "New chat",
-    "send": "Send"
+    "send": "Send",
+    "welcomeBoth": "Hi! I can fill in a daily report with you, or look through the company mailbox. What do you need?",
+    "welcomeMail": "Hi! Ask me about the company mailbox, for example a summary of last week's emails.",
+    "e1": "Summarise last week's emails",
+    "e2": "Emails that need attention or an offer response",
+    "e3": "Unread emails from clients this week"
   },
   "ann1": {
     "s": "Wed 4 Nov · 07:00 · all site staff",
@@ -1916,5 +1919,31 @@
     "returnedToast": "Weekly report returned",
     "forbidden": "You do not have access to weekly reports.",
     "needNote": "Add a note saying what to fix."
+  },
+  "mail": {
+    "title": "Company mailbox",
+    "connected": "Connected",
+    "notConnectedBadge": "Not connected",
+    "intro": "Connect the company Gmail so Super Admins can ask the AI assistant about email. Access is read-only: the assistant can search and read messages, never send, delete or change them.",
+    "result": {
+      "connected": "Mailbox connected. Open the AI assistant and ask about your email.",
+      "cancelled": "Google sign-in was cancelled. Nothing was connected.",
+      "expired": "That sign-in link expired. Press Connect Gmail again.",
+      "forbidden": "Only a Super Admin can connect the company mailbox.",
+      "scope": "Read access to Gmail was not allowed. Press Connect Gmail again and allow it.",
+      "error": "The mailbox could not be connected. Try again."
+    },
+    "address": "Mailbox",
+    "since": "Connected on",
+    "howToAsk": "Ask in the AI assistant, e.g. \"Summarise the emails from last week\" or \"Which emails need an offer response?\"",
+    "disconnect": "Disconnect",
+    "setupNeeded": "Gmail is not set up on the server yet: add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and EMAIL_TOKEN_KEY (see env.example).",
+    "redirect": "Authorized redirect URI",
+    "copy": "Copy",
+    "copied": "Copied",
+    "redirectHint": "Add this address to the OAuth client in Google Cloud (APIs & Services > Credentials) before connecting.",
+    "connect": "Connect Gmail",
+    "forbidden": "Only a Super Admin can manage the company mailbox.",
+    "notConfigured": "Gmail is not set up on the server yet."
   }
 }
