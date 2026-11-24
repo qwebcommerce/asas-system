@@ -6,6 +6,8 @@ import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
 import { useReports } from "@/components/use-reports";
+import { WeeklyReports } from "@/components/weekly-reports";
+import { Tabs } from "@/components/ui/data";
 import { Toast } from "@/components/ui/overlay";
 import { Link } from "@/i18n/navigation";
 import { projectTitle } from "@/lib/reports";
@@ -18,6 +20,11 @@ export function ReportScreen() {
   const { reports, ready, canManage, canView } = useReports();
   const [toast, setToast] = useState<{ title: string; detail: string } | null>(null);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState("daily");
+  const notify = (title: string, detail: string) => {
+    setToast({ title, detail });
+    window.setTimeout(() => setToast(null), 3000);
+  };
   const ordered = [...reports].sort((a, b) => b.date.localeCompare(a.date) || projectTitle(a, locale).localeCompare(projectTitle(b, locale)));
 
   return (
@@ -38,9 +45,11 @@ export function ReportScreen() {
           </div>
         ) : null}
       </div>
+      {canView ? <Tabs items={[{ id: "daily", label: t("wk.tabDaily") }, { id: "weekly", label: t("wk.tabWeekly") }]} value={tab} onChange={setTab} /> : null}
+      {tab === "weekly" ? <WeeklyReports notify={notify} /> : null}
       {!canView ? <p className="muted">{t("rep.forbidden")}</p> : null}
       {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
-      {canView ? (
+      {canView && tab === "daily" ? (
         <div className="card card--flush table-wrap">
           <table className="table table--cards">
             <thead>

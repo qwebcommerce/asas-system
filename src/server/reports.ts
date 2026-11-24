@@ -2,51 +2,12 @@
 
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
-import { reportServices, workStatuses, type ReportInput, type WorkItem } from "@/lib/reports";
+import { cleanReportInput, type ReportInput } from "@/lib/reports";
 import type { ActionResult } from "@/lib/directory";
 import { canReadAll, canWriteModule, seesOwn } from "@/lib/access";
 import { projectLink } from "@/server/project-link";
 import { actor, audit, type Gate } from "@/server/session";
 import { removePrivateFile, signedReadUrl } from "@/server/blobs";
-
-function count(value: number, max: number) {
-  if (!Number.isFinite(value)) return null;
-  const next = Math.round(value);
-  if (next < 0 || next > max) return null;
-  return next;
-}
-
-function clean(input: ReportInput): ReportInput | null {
-  const projectEn = input.projectEn.trim();
-  const projectAr = input.projectAr.trim();
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(input.date) ? input.date : "";
-  const workers = count(input.workers, 999);
-  const progress = count(input.progress, 100);
-  if (!projectEn || !projectAr || !date || !reportServices.includes(input.service) || workers === null || progress === null) return null;
-  if (!Array.isArray(input.items) || input.items.length > 40) return null;
-  const items: WorkItem[] = [];
-  for (const item of input.items) {
-    const area = item.area.trim();
-    const work = item.work.trim();
-    if (!area && !work) continue;
-    const done = count(item.done, 100);
-    if (!area || !work || !workStatuses.includes(item.status) || done === null) return null;
-    items.push({ area, work, done, status: item.status });
-  }
-  return {
-    projectId: input.projectId,
-    projectEn,
-    projectAr,
-    date,
-    weather: input.weather.trim().slice(0, 80),
-    service: input.service,
-    workers,
-    subcontractors: input.subcontractors.trim().slice(0, 200),
-    progress,
-    issues: input.issues.trim().slice(0, 4000),
-    items,
-  };
-}
 
 /** Every report belongs to a project; its names are copied from the project. */
 async function withProject(input: ReportInput): Promise<ReportInput | string> {
@@ -80,7 +41,7 @@ export async function createProjectReport(idToken: string, input: ReportInput): 
     if ("error" in who) return { ok: false, error: who.error };
     const linked = await withProject(input);
     if (typeof linked === "string") return { ok: false, error: linked };
-    const report = clean(linked);
+    const report = cleanReportInput(linked);
     if (!report) return { ok: false, error: "us.invalid" };
     const ref = await adminDb().collection("projectReports").add({
       ...report,
@@ -100,7 +61,7 @@ export async function updateProjectReport(idToken: string, reportId: string, inp
     if ("error" in who) return { ok: false, error: who.error };
     const linked = await withProject(input);
     if (typeof linked === "string") return { ok: false, error: linked };
-    const report = clean(linked);
+    const report = cleanReportInput(linked);
     if (!report) return { ok: false, error: "us.invalid" };
     const ref = adminDb().collection("projectReports").doc(reportId);
     const snap = await ref.get();

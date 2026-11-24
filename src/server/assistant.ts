@@ -1,0 +1,284 @@
+"use server";
+
+import Anthropic from "@anthropic-ai/sdk";
+import { canWriteModule, seesOwn } from "@/lib/access";
+import { adminDb } from "@/lib/firebase-admin";
+import { qatarToday } from "@/lib/hr";
+import { mapOffer } from "@/lib/offers";
+import { mapProject } from "@/lib/projects";
+import { cleanReportInput, latestReport, mapProjectReport, offerWorkItems, reportServices, workStatuses, type ReportInput } from "@/lib/reports";
+import { actor } from "@/server/session";
+
+/*
+ * ASAS Assistant: a chat that collects a site's daily report from the person filling it in.
+ *
+ * - Only people who may write project reports can use it (same rule as the report form).
+ * - Claude reads projects and their offers/last report through tools that run here with the
+ *   person's access, and prepares the report with `prepare_daily_report`.
+ * - Claude never saves anything. The prepared report comes back as a draft that the person
+ *   checks and submits with the normal, permission-checked createProjectReport action.
+ *
+ * The conversation is kept by the browser and sent back each turn, unchanged (append-only),
+ * because the model's thinking blocks must be replayed exactly as they were returned.
+ */
+
+type Message = Anthropic.Beta.Messages.BetaMessageParam;
+export type AssistantMessage = Message;
+
+export type AssistantDraft = ReportInput & { projectCode: string };
+
+export type AssistantTurn =
+  | { ok: true; messages: Message[]; reply: string; draft: AssistantDraft | null }
+  | { ok: false; error: string };
+
+const MODEL = "claude-opus-5-5";
+/** Most model calls one turn may make (tool round trips included) */
+const MAX_STEPS = 6;
+/** Conversations longer than this start over (keeps requests small and history append-only) */
+const MAX_MESSAGES = 60;
+
+const TOOLS: Anthropic.Beta.Messages.BetaTool[] = [
+  {
+    name: "list_projects",
+    description:
+      "List the company's open projects (not completed) that a daily report can be written for, with each project's code, names, type, site location and its latest report date and progress. Call this first to find the project the person means.",
+    strict: true,
+    input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
+  },
+  {
+    name: "get_project_details",
+    description:
+      "Details for one project: the work items from its offers (area + work), the work items and progress of its latest daily report, and that report's date, workers and progress. Use it to ask about progress item by item.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: { project_id: { type: "string", description: "Project id from list_projects" } },
+      required: ["project_id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "prepare_daily_report",
+    description:
+      "Prepare the daily report once the person has given the details. This does NOT save it: the person sees the prepared report and presses Submit. Call it again with corrections if they ask for changes.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        project_id: { type: "string" },
+        date: { type: "string", format: "date", description: "Report date, YYYY-MM-DD" },
+        weather: { type: "string", description: "Short weather note, e.g. 'Sunny, 34°C'; empty if not given" },
+        service: { type: "string", enum: [...reportServices], description: "Main type of work done today" },
+        workers: { type: "integer", description: "Workers on site today (0-999)" },
+        subcontractors: { type: "string", description: "Subcontractors on site; empty if none" },
+        progress: { type: "integer", description: "Overall project progress in percent (0-100)" },
+        issues: { type: "string", description: "Issues, delays or requests; empty if none" },
+        items: {
+          type: "array",
+          description: "Work done today, one row per area + work",
+          items: {
+            type: "object",
+            properties: {
+              area: { type: "string" },
+              work: { type: "string" },
+              done: { type: "integer", description: "Percent complete for this item (0-100)" },
+              status: { type: "string", enum: [...workStatuses] },
+            },
+            required: ["area", "work", "done", "status"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["project_id", "date", "weather", "service", "workers", "subcontractors", "progress", "issues", "items"],
+      additionalProperties: false,
+    },
+  },
+];
+
+function systemPrompt(name: string, locale: string, today: string) {
+  return [
+    "You are the ASAS Assistant inside the private system of ASAS Executive Contracting, a construction, finishing, interior design and furniture company in Qatar.",
+    "Your job here is to help site staff file the daily report for a project, by chatting with them.",
+    "",
+    "How to work:",
+    "- Find the project with list_projects. If more than one could match, ask which one. Then call get_project_details for it.",
+    "- Collect the report: date (default today), weather, main service, number of workers, subcontractors on site, overall progress %, the work done today per area (with % complete and status: complete, progress or waiting), and any issues or delays.",
+    "- Ask for missing details a few at a time, in short messages. Suggest the work items from the offer or the last report so the person only has to update the percentages.",
+    "- Never invent numbers or work. If something is unknown, ask; if they say there is none, leave it empty.",
+    "- When you have enough, call prepare_daily_report. Then tell them, in one or two sentences, to check the report shown below the chat and press Submit, or tell you what to change.",
+    "- You cannot save, submit, delete or approve anything yourself, and you only help with daily reports. For anything else, say briefly that you can only help with daily reports for now.",
+    "",
+    `Today in Qatar is ${today}. The person you are talking to is ${name || "a staff member"}.`,
+    `Reply in ${locale === "ar" ? "Arabic" : "English"}, unless they write to you in the other language. Keep replies short and plain; no markdown tables.`,
+  ].join("\n");
+}
+
+/** What the browser may send back: user/assistant turns only, no more than MAX_MESSAGES. */
+function validHistory(history: unknown): history is Message[] {
+  return (
+    Array.isArray(history) &&
+    history.length <= MAX_MESSAGES &&
+    history.every((item) => item && typeof item === "object" && ((item as Message).role === "user" || (item as Message).role === "assistant"))
+  );
+}
+
+async function openProjects() {
+  const snap = await adminDb().collection("projects").get();
+  return snap.docs.flatMap((doc) => mapProject(doc.id, doc.data()) ?? []).filter((project) => project.status !== "completed");
+}
+
+async function projectReports(projectId: string) {
+  const snap = await adminDb().collection("projectReports").where("projectId", "==", projectId).get();
+  return snap.docs.flatMap((doc) => mapProjectReport(doc.id, doc.data()) ?? []);
+}
+
+async function runTool(name: string, input: Record<string, unknown>, locale: string, today: string): Promise<{ result: unknown; draft?: AssistantDraft }> {
+  if (name === "list_projects") {
+    const projects = await openProjects();
+    const rows = await Promise.all(
+      projects.map(async (project) => {
+        const last = latestReport(await projectReports(project.id), project.id);
+        return {
+          project_id: project.id,
+          code: project.code,
+          name_en: project.nameEn,
+          name_ar: project.nameAr,
+          type: project.kind,
+          status: project.status,
+          location: project.locationEn || project.locationAr,
+          last_report: last ? { date: last.date, progress: last.progress } : null,
+        };
+      }),
+    );
+    return { result: rows.length ? rows : "There are no open projects. Ask the person to create the project first in Projects." };
+  }
+
+  if (name === "get_project_details") {
+    const projectId = typeof input.project_id === "string" ? input.project_id : "";
+    const snap = projectId ? await adminDb().collection("projects").doc(projectId).get() : null;
+    const project = snap?.exists ? mapProject(snap.id, snap.data() ?? {}) : null;
+    if (!project) return { result: { error: "No project with that id. Use list_projects." } };
+    const offersSnap = await adminDb().collection("offers").where("projectId", "==", projectId).get();
+    const offers = offersSnap.docs.flatMap((doc) => mapOffer(doc.id, doc.data()) ?? []).filter((offer) => offer.status !== "rejected");
+    const last = latestReport(await projectReports(projectId), projectId);
+    return {
+      result: {
+        project: { project_id: project.id, code: project.code, name_en: project.nameEn, name_ar: project.nameAr, type: project.kind, location: project.locationEn || project.locationAr },
+        offers: offers.map((offer) => ({ number: offer.number, status: offer.status })),
+        offer_work_items: offerWorkItems(offers, locale).map(({ area, work }) => ({ area, work })),
+        latest_report: last
+          ? { date: last.date, service: last.service, workers: last.workers, progress: last.progress, items: last.items, issues: last.issues }
+          : null,
+      },
+    };
+  }
+
+  if (name === "prepare_daily_report") {
+    const projectId = typeof input.project_id === "string" ? input.project_id : "";
+    const snap = projectId ? await adminDb().collection("projects").doc(projectId).get() : null;
+    const project = snap?.exists ? mapProject(snap.id, snap.data() ?? {}) : null;
+    if (!project) return { result: { error: "No project with that id. Use list_projects." } };
+    const items = Array.isArray(input.items) ? input.items : [];
+    const draft = cleanReportInput({
+      projectId: project.id,
+      projectEn: project.nameEn,
+      projectAr: project.nameAr || project.nameEn,
+      date: typeof input.date === "string" ? input.date : today,
+      weather: typeof input.weather === "string" ? input.weather : "",
+      service: reportServices.find((service) => service === input.service) ?? "construction",
+      workers: Number(input.workers),
+      subcontractors: typeof input.subcontractors === "string" ? input.subcontractors : "",
+      progress: Number(input.progress),
+      issues: typeof input.issues === "string" ? input.issues : "",
+      items: items.map((item) => {
+        const row = (item ?? {}) as Record<string, unknown>;
+        return {
+          area: typeof row.area === "string" ? row.area : "",
+          work: typeof row.work === "string" ? row.work : "",
+          done: Number(row.done),
+          status: workStatuses.find((status) => status === row.status) ?? "progress",
+        };
+      }),
+    });
+    if (!draft) {
+      return { result: { error: "Some values are out of range (workers 0-999, percentages 0-100, every item needs an area and a work description, at most 40 items). Fix them or ask the person." } };
+    }
+    if (draft.date > today) return { result: { error: `The report date cannot be in the future (today is ${today}).` } };
+    return { result: "Prepared and shown to the person for checking. It is not saved until they press Submit.", draft: { ...draft, projectCode: project.code } };
+  }
+
+  return { result: { error: `Unknown tool ${name}` } };
+}
+
+/** One chat turn: adds the person's message, runs Claude (with tools) until it replies, returns the new history. */
+export async function assistantTurn(idToken: string, locale: string, history: unknown, text: string): Promise<AssistantTurn> {
+  const who = await actor(idToken);
+  if ("error" in who) return { ok: false, error: who.error };
+  const level = who.level("reports");
+  if (!canWriteModule(level) && !seesOwn(level)) return { ok: false, error: "ai.noAccess" };
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_BASE_URL) return { ok: false, error: "ai.notConfigured" };
+  const message = text.trim().slice(0, 4000);
+  if (!message || !validHistory(history)) return { ok: false, error: "us.invalid" };
+  if (history.length + 1 > MAX_MESSAGES) return { ok: false, error: "ai.tooLong" };
+
+  const profile = await adminDb().collection("users").doc(who.uid).get();
+  const name = typeof profile.data()?.name === "string" ? (profile.data()?.name as string) : "";
+  const today = qatarToday();
+  const messages: Message[] = [...history, { role: "user", content: message }];
+  const client = new Anthropic();
+  let draft: AssistantDraft | null = null;
+
+  try {
+    for (let step = 0; step < MAX_STEPS; step++) {
+      const response = await client.beta.messages.create({
+        model: MODEL,
+        max_tokens: 16000,
+        // Chat replies: low effort keeps answers quick; the tools carry the facts
+        output_config: { effort: "low" },
+        // If Claude declines for safety reasons, the API retries on a fallback model in the same call
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        // Cache the fixed tools + instructions across turns
+        cache_control: { type: "ephemeral" },
+        system: systemPrompt(name, locale, today),
+        tools: TOOLS,
+        messages,
+      });
+      // Keep the full content (thinking, fallback and tool blocks) so the history stays replayable
+      messages.push({ role: "assistant", content: response.content });
+
+      if (response.stop_reason === "refusal") {
+        return { ok: true, messages, reply: locale === "ar" ? "لا أستطيع المساعدة في هذا الطلب." : "I can't help with that request.", draft };
+      }
+      if (response.stop_reason === "pause_turn") continue;
+      const calls = response.content.filter((block): block is Anthropic.Beta.Messages.BetaToolUseBlock => block.type === "tool_use");
+      if (response.stop_reason !== "tool_use" || calls.length === 0) {
+        const reply = response.content
+          .filter((block): block is Anthropic.Beta.Messages.BetaTextBlock => block.type === "text")
+          .map((block) => block.text)
+          .join("\n")
+          .trim();
+        return { ok: true, messages, reply, draft };
+      }
+
+      // Run every tool call of this turn and answer them together in one user message
+      const results: Anthropic.Beta.Messages.BetaToolResultBlockParam[] = [];
+      for (const call of calls) {
+        try {
+          const outcome = await runTool(call.name, (call.input ?? {}) as Record<string, unknown>, locale, today);
+          if (outcome.draft) draft = outcome.draft;
+          results.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(outcome.result) });
+        } catch {
+          results.push({ type: "tool_result", tool_use_id: call.id, content: "The system could not read this right now.", is_error: true });
+        }
+      }
+      messages.push({ role: "user", content: results });
+    }
+    return { ok: false, error: "ai.failed" };
+  } catch (error) {
+    if (error instanceof Anthropic.RateLimitError) return { ok: false, error: "ai.busy" };
+    if (error instanceof Anthropic.AuthenticationError) return { ok: false, error: "ai.notConfigured" };
+    console.error("assistant turn failed", error);
+    return { ok: false, error: "ai.failed" };
+  }
+}

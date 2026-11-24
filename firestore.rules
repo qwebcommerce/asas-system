@@ -133,6 +133,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Weekly project reports: built by the server, approved by a Super Admin through server actions
+    match /weeklyReports/{id} {
+      allow read: if readsAll("reports");
+      allow write: if false;
+    }
+
     match /offers/{id} {
       allow read: if readsAll("offers") || (readsOwn("offers") && resource.data.createdBy == request.auth.uid);
       allow write: if false;
