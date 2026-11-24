@@ -6,7 +6,7 @@ import { canReadAll, canWriteModule } from "@/lib/access";
 import type { ActionResult } from "@/lib/directory";
 import { adminDb } from "@/lib/firebase-admin";
 import { qatarToday } from "@/lib/hr";
-import { isOfferKind } from "@/lib/offers";
+import { isOfferKind, mapOffer, offerTotals } from "@/lib/offers";
 import { isProjectImageSlot, PROJECT_LIMITS, projectImageSlots, projectProblems, projectStatuses, type ProjectImageSlot, type ProjectInput } from "@/lib/projects";
 import { slugify } from "@/lib/website";
 import { removePrivateFile, signedReadUrl } from "@/server/blobs";
@@ -185,6 +185,67 @@ export async function openProjectImage(idToken: string, projectId: string, slot:
     const path = snap.data()?.[`${slot}Path`];
     if (!snap.exists || typeof path !== "string" || !path.startsWith("website/")) return fail("us.invalid");
     return { ok: true, url: await signedReadUrl(path) };
+  } catch {
+    return fail("auth.failed");
+  }
+}
+
+/**
+ * Starts a project from an offer (usually once the client accepts it): copies the client and
+ * project details, sets the budget to the offer total, and links the offer to the new project.
+ */
+export async function createProjectFromOffer(idToken: string, offerId: string): Promise<ActionResult> {
+  try {
+    const who = await gate(idToken, true);
+    if ("error" in who) return fail(who.error);
+    if (!canReadAll(who.level("offers"))) return fail("off.forbidden");
+    const offerRef = adminDb().collection("offers").doc(offerId);
+    const snap = await offerRef.get();
+    const offer = snap.exists ? mapOffer(snap.id, snap.data() ?? {}) : null;
+    if (!offer) return fail("us.invalid");
+    if (offer.projectId) return fail("prj.offerLinked");
+    const project = clean({
+      nameEn: offer.projectEn,
+      nameAr: offer.projectAr,
+      kind: offer.kind,
+      status: "planning",
+      clientEn: offer.clientEn,
+      clientAr: offer.clientAr,
+      clientPhone: offer.phone,
+      clientEmail: "",
+      clientIdNo: offer.clientId,
+      clientAddressEn: offer.addressEn,
+      clientAddressAr: offer.addressAr,
+      locationEn: "",
+      locationAr: "",
+      budget: offerTotals(offer.lines, offer.discountPct).total,
+      startOn: "",
+      endOn: "",
+      notesEn: `From offer ${offer.number}`,
+      notesAr: `من العرض ${offer.number}`,
+      published: false,
+      summaryEn: "",
+      summaryAr: "",
+    });
+    // The offer needs the project and client names in both languages first
+    if (!project) return fail("prj.offerIncomplete");
+    const ref = await adminDb().collection("projects").add({
+      ...project,
+      code: await nextCode(),
+      slug: await uniqueSlug(project.nameEn),
+      coverPath: "",
+      coverType: "",
+      photo1Path: "",
+      photo1Type: "",
+      photo2Path: "",
+      photo2Type: "",
+      offerId,
+      createdBy: who.uid,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    await offerRef.update({ projectId: ref.id, projectEn: project.nameEn, projectAr: project.nameAr });
+    await audit("projects.fromOffer", who.uid, ref.id, offer.number);
+    return { ok: true, id: ref.id };
   } catch {
     return fail("auth.failed");
   }

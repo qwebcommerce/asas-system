@@ -7,11 +7,12 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { ProjectSelect } from "@/components/project-select";
 import { Icon } from "@/components/icon";
+import { useOffers } from "@/components/use-offers";
 import { useReports } from "@/components/use-reports";
 import { Link, useRouter } from "@/i18n/navigation";
 import { fileProblem } from "@/lib/files";
 import { qatarToday } from "@/lib/hr";
-import { projectTitle, reportServices, workStatuses, type ProjectReport, type ReportFile, type ReportInput, type ReportService, type WorkItem, type WorkStatus } from "@/lib/reports";
+import { latestReport, mergeWorkItems, offerWorkItems, projectTitle, reportServices, workStatuses, type ProjectReport, type ReportFile, type ReportInput, type ReportService, type WorkItem, type WorkStatus } from "@/lib/reports";
 import { createProjectReport, deleteReportFile, openReportFile, updateProjectReport } from "@/server/reports";
 
 type DraftItem = WorkItem & { key: string };
@@ -60,7 +61,8 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
   const locale = useLocale();
   const router = useRouter();
   const { getToken } = useAuth();
-  const { files } = useReports();
+  const { files, reports } = useReports();
+  const { offers, canView: canViewOffers } = useOffers();
   const [savedId, setSavedId] = useState(initial?.id ?? "");
   const [pending, setPending] = useState<{ key: string; file: File }[]>([]);
   const [pickKey, setPickKey] = useState(0);
@@ -78,6 +80,17 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
   const [issues, setIssues] = useState(initial?.issues ?? "");
   const [items, setItems] = useState<DraftItem[]>(() => (initial?.items ?? []).map((item, index) => ({ ...item, key: `${initial?.id ?? "new"}-${index}` })));
   const [error, setError] = useState("");
+  // The project's offers (accepted ones first) and its latest earlier report, to start the work list from
+  const projectOffers = canViewOffers && projectId
+    ? offers.filter((offer) => offer.projectId === projectId && offer.status !== "rejected").sort((a, b) => Number(b.status === "accepted") - Number(a.status === "accepted"))
+    : [];
+  const previous = projectId ? latestReport(reports, projectId, initial?.id ?? "") : null;
+  function addItems(extra: WorkItem[]) {
+    setItems((current) => {
+      const merged = mergeWorkItems(current, extra);
+      return [...current, ...merged.slice(current.length).map((item) => ({ ...item, key: crypto.randomUUID() }))];
+    });
+  }
   const [fileError, setFileError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -216,6 +229,17 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
         <Field label={t("rep.subs")} value={subcontractors} onChange={setSubcontractors} />
         <div className="between">
           <h3 className="card-title">{t("col.work")}</h3>
+          <div className="hstack">
+          {projectOffers.length > 0 ? (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => addItems(offerWorkItems(projectOffers, locale))}>
+              {t("rep.fromOffer", { count: projectOffers.length })}
+            </button>
+          ) : null}
+          {previous ? (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => addItems(previous.items)}>
+              {t("rep.fromLast", { date: previous.date })}
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn--secondary btn--sm"
@@ -224,7 +248,16 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
             <Icon name="plus" />
             {t("rep.addItem")}
           </button>
+          </div>
         </div>
+        {projectId && projectOffers.length > 0 ? (
+          <p className="muted" style={{ margin: 0 }}>
+            {t("rep.linkedOffers")}{" "}
+            {projectOffers.map((offer, i) => (
+              <span key={offer.id}>{i ? ", " : ""}<Link href={`/offers/${offer.id}/quotation`}><bdi>{offer.number}</bdi></Link></span>
+            ))}
+          </p>
+        ) : null}
         <div className="card card--flush table-wrap">
           <table className="table table--cards">
             <thead>

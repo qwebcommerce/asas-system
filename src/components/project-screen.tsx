@@ -19,7 +19,8 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { billState, invoiceMath, invoiceState, partyName } from "@/lib/accounting";
 import { documentTitle } from "@/lib/documents";
 import { qatarToday } from "@/lib/hr";
-import { offerTitle, offerTotals } from "@/lib/offers";
+import { offerTitle, offerTotals, type Offer } from "@/lib/offers";
+import type { ProjectReport } from "@/lib/reports";
 import { projectName, type Project } from "@/lib/projects";
 import { openLibraryFile } from "@/server/documents";
 import { deleteProject } from "@/server/projects";
@@ -137,7 +138,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
           ]}
         />
 
-        {tab === "overview" ? <Overview project={project} /> : null}
+        {tab === "overview" ? <Overview project={project} offers={offers} reports={reports} /> : null}
 
         {tab === "reports" ? (
           <Section
@@ -292,12 +293,29 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
   );
 }
 
-function Overview({ project }: { project: Project }) {
+function Overview({ project, offers, reports }: { project: Project; offers: Offer[]; reports: ProjectReport[] }) {
   const t = useTranslations();
   const locale = useLocale();
   const pick = (en: string, ar: string) => (locale === "ar" ? ar || en : en || ar) || "—";
+  // Contract value = accepted offers; progress = the latest daily report
+  const accepted = offers.filter((offer) => offer.status === "accepted");
+  const contract = accepted.reduce((sum, offer) => sum + offerTotals(offer.lines, offer.discountPct).total, 0);
+  const latest = reports[0] ?? null;
   return (
     <div className="grid-2">
+      <div className="card stack stack--sm" style={{ gridColumn: "1 / -1" }}>
+        <h3 className="card-title">{t("prj.delivery")}</h3>
+        <div className="kv"><span>{t("prj.contractValue")}</span><b className="num"><bdi>{accepted.length ? formatQar(contract, locale) : "—"}</bdi></b></div>
+        <div className="kv">
+          <span>{t("prj.acceptedOffers")}</span>
+          <span>{accepted.length ? accepted.map((offer, i) => <span key={offer.id}>{i ? ", " : ""}<Link href={`/offers/${offer.id}/contract`}><bdi>{offer.number}</bdi></Link></span>) : t("prj.noAccepted", { count: offers.length })}</span>
+        </div>
+        <div className="kv">
+          <span>{t("prj.lastProgress")}</span>
+          <span>{latest ? <Link href={`/reports/${latest.id}`}><bdi className="num">{latest.progress}%</bdi> · {formatDay(latest.date, locale)}</Link> : t("prj.noReportsYet")}</span>
+        </div>
+        {latest ? <div className="progress progress--accent" aria-hidden="true"><span style={{ width: `${latest.progress}%` }} /></div> : null}
+      </div>
       <div className="card stack stack--sm">
         <h3 className="card-title">{t("prj.sectionClient")}</h3>
         <div className="kv"><span>{t("prj.clientName")}</span><b>{pick(project.clientEn, project.clientAr)}</b></div>

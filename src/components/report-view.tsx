@@ -54,7 +54,9 @@ export function ReportView({ reportId }: { reportId: string }) {
         <div className="page-header">
           <div>
             <span className="eyebrow">{t("nav.reports")}</span>
-            <h2 className="page-title">{projectTitle(report, locale)}</h2>
+            <h2 className="page-title">
+              {report.projectId ? <Link href={`/projects/${report.projectId}`}>{projectTitle(report, locale)}</Link> : projectTitle(report, locale)}
+            </h2>
             <p className="page-sub">{locale === "ar" ? report.projectEn : report.projectAr}</p>
           </div>
           {canManage ? (

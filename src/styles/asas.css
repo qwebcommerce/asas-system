@@ -1036,3 +1036,51 @@ img, svg { display: block; max-width: 100%; }
   .rv-fit { zoom: 1; margin: 0; }
   .rv-public { background: #fff; padding: 0; display: block; min-height: 0; }
 }
+
+/* ASAS Assistant (sidebar drawer): chat that prepares daily reports */
+.ai-panel { display: flex; flex-direction: column; gap: 14px; }
+.ai-panel__list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-inline-end: 4px; }
+.ai-bubble { max-width: 88%; margin: 0; padding: 11px 14px; border-radius: 16px; line-height: 1.5; white-space: pre-line; font-size: 14.5px; }
+.ai-bubble--ai { align-self: flex-start; background: #262627; color: var(--mist); border-end-start-radius: 4px; }
+.ai-bubble--me { align-self: flex-end; background: var(--champagne); color: var(--onyx); border-end-end-radius: 4px; }
+.ai-bubble--note { align-self: center; max-width: 100%; background: transparent; border: 1px solid #3A3A3B; color: var(--silver); font-size: 13px; text-align: center; }
+.ai-bubble--note a { color: var(--champagne); text-decoration: underline; text-underline-offset: 3px; }
+.ai-bubble--typing { display: inline-flex; gap: 5px; }
+.ai-bubble--typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--steel); animation: ai-dot 1.2s infinite ease-in-out; }
+.ai-bubble--typing i:nth-child(2) { animation-delay: .15s; }
+.ai-bubble--typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes ai-dot { 0%, 80%, 100% { opacity: .3; transform: none; } 40% { opacity: 1; transform: translateY(-3px); } }
+.ai-panel__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-chip { background: transparent; border-color: #3A3A3B; color: var(--silver); }
+.ai-chip:hover { border-color: var(--champagne); color: var(--mist); }
+.ai-panel__new { border: 1px solid #3A3A3B; background: transparent; color: var(--silver); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
+.ai-panel__new:hover { color: var(--mist); border-color: var(--steel); }
+.ai-panel__form { display: flex; align-items: flex-end; gap: 8px; padding: 6px; border: 1px solid #333334; border-radius: 18px; background: #262627; }
+.ai-panel__form textarea { flex: 1; min-height: 40px; max-height: 140px; resize: none; border: 0; outline: none; background: transparent; color: var(--mist); font: inherit; font-size: 14.5px; padding: 9px 8px; field-sizing: content; }
+.ai-panel__form textarea::placeholder { color: var(--steel); }
+.ai-panel__send { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border: 0; border-radius: 50%; background: var(--champagne); color: var(--onyx); cursor: pointer; }
+.ai-panel__send:disabled { opacity: .4; cursor: default; }
+[dir="rtl"] .ai-panel__send svg { transform: scaleX(-1); }
+.ai-panel__error { margin: 0; color: #E8A79F; font-size: 13px; }
+.ai-draft { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: #F2F2F0; color: var(--onyx); }
+.ai-draft__kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
+.ai-draft__kv > span:first-child { color: #626467; }
+.ai-draft__kv b { font-weight: 600; text-align: end; }
+.ai-draft__items { margin: 4px 0 0; padding: 0; list-style: none; border-top: 1px solid #DADBDD; }
+.ai-draft__items li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid #DADBDD; font-size: 13px; }
+.ai-draft__issues { margin: 0; font-size: 13px; color: #474748; }
+.ai-draft .btn--ghost { color: var(--onyx); }
+
+/* Weekly project reports */
+.wk-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.wk-stats > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface-sunken); }
+.wk-stats small { color: var(--text-2); font-size: 12px; }
+.wk-stats b { font-size: 17px; font-weight: 600; }
+.wk-list { margin: 0; padding-inline-start: 20px; display: grid; gap: 4px; }
+.wk-risks, .wk-note { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg, #F6EEDD); font-size: 14px; }
+.wk-note { background: var(--danger-bg, #F6E6E4); }
+@media (max-width: 720px) { .wk-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Company mailbox card (Settings) */
+.mail-result { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); font-size: 13.5px; }
+.mail-result--ok { background: var(--ok-bg, #E8F1EB); color: var(--ok, #3F7A57); }

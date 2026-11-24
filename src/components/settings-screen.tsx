@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
+import { MailboxCard } from "@/components/mailbox-card";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
 import { setTheme } from "@/components/theme";
@@ -193,6 +194,7 @@ export function SettingsScreen() {
             </div>
             <small className="muted">{t("set.langS")}</small>
           </div>
+          <Suspense fallback={null}><MailboxCard /></Suspense>
           <div className="card stack stack--sm">
             <h3 className="card-title">{t("set.theme")}</h3>
             <div className="grid-2">

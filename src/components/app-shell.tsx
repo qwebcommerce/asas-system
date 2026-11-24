@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { AssistantPanel } from "@/components/assistant-panel";
 import { useAuth } from "@/components/auth-provider";
 import Image from "next/image";
 import { Icon } from "@/components/icon";
@@ -156,72 +157,7 @@ export function AppShell({
           <main className="content">{children}</main>
         </div>
       </div>
-      <aside
-        className={`drawer drawer--dark${aiOpen ? " is-open" : ""}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ai-title"
-      >
-        <div className="between">
-          <div className="hstack" style={{ color: "var(--champagne)" }}>
-            <Icon name="spark" className="icon icon--lg" />
-            <h2 id="ai-title" style={{ fontSize: 18, color: "#F2F2F2" }}>
-              {t("ai.title")}
-            </h2>
-          </div>
-          <button
-            type="button"
-            className="close"
-            style={{ background: "#262627", color: "var(--steel)" }}
-            aria-label={t("common.close")}
-            onClick={() => setAiOpen(false)}
-          >
-            <Icon name="x" className="icon icon--sm" />
-          </button>
-        </div>
-        <div
-          style={{
-            alignSelf: "flex-end",
-            maxWidth: "80%",
-            background: "var(--champagne)",
-            color: "var(--onyx)",
-            padding: "12px 14px",
-            borderRadius: "16px 16px 4px 16px",
-          }}
-        >
-          {t("ai.q1")}
-        </div>
-        <div
-          style={{
-            maxWidth: "90%",
-            background: "#262627",
-            padding: "12px 14px",
-            borderRadius: "16px 16px 16px 4px",
-            color: "var(--mist)",
-          }}
-        >
-          {t("ai.a1")}
-        </div>
-        <div className="hstack">
-          {(["s1", "s2", "s3"] as const).map((id) => (
-            <button
-              key={id}
-              type="button"
-              className="chip"
-              style={{ background: "transparent", borderColor: "#3A3A3B", color: "var(--silver)" }}
-            >
-              {t(`ai.${id}`)}
-            </button>
-          ))}
-        </div>
-        <div style={{ marginTop: "auto" }} className="stack stack--sm">
-          <label className="search" style={{ width: "100%", height: 52, background: "#262627", borderColor: "#333334" }}>
-            <Icon name="spark" className="icon icon--sm" />
-            <input placeholder={t("ai.ask")} />
-          </label>
-          <small style={{ color: "var(--steel)", textAlign: "center" }}>{t("ai.note")}</small>
-        </div>
-      </aside>
+      <AssistantPanel open={aiOpen} onClose={() => setAiOpen(false)} />
       <div
         className={`overlay${menuOpen || aiOpen ? " is-open" : ""}`}
         onClick={() => {

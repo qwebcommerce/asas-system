@@ -6,16 +6,20 @@ import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
 import { useOffers } from "@/components/use-offers";
+import { useProjects } from "@/components/use-projects";
 import { Toast } from "@/components/ui/overlay";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { offerTitle, offerTotals, type OfferStatus } from "@/lib/offers";
 import { deleteOffer } from "@/server/offers";
+import { createProjectFromOffer } from "@/server/projects";
 
 export function OfferScreen() {
   const t = useTranslations();
   const locale = useLocale();
   const { getToken } = useAuth();
   const { offers, ready, canManage, canView } = useOffers();
+  const { canManage: canManageProjects } = useProjects();
+  const router = useRouter();
   const [toast, setToast] = useState<{ title: string; detail: string } | null>(null);
   const [error, setError] = useState("");
   const [menuId, setMenuId] = useState<string | null>(null);
@@ -63,7 +67,14 @@ export function OfferScreen() {
                       <b>{offerTitle(offer, locale)}</b>
                       <small className="muted" style={{ display: "block" }}>{locale === "ar" ? offer.clientEn : offer.clientAr}</small>
                     </td>
-                    <td data-label={t("off.project")}>{locale === "ar" ? offer.projectAr || offer.projectEn : offer.projectEn}</td>
+                    <td data-label={t("off.project")}>
+                      {offer.projectId ? (
+                        <Link href={`/projects/${offer.projectId}`}>{locale === "ar" ? offer.projectAr || offer.projectEn : offer.projectEn}</Link>
+                      ) : (
+                        locale === "ar" ? offer.projectAr || offer.projectEn : offer.projectEn
+                      )}
+                      {!offer.projectId ? <small className="muted" style={{ display: "block" }}>{t("prj.notLinked")}</small> : null}
+                    </td>
                     <td data-label={t("col.status")}><span className={`badge badge--${statusTone(offer.status)}`}>{t(`off.${offer.status}`)}</span></td>
                     <td data-label={t("off.validUntil")} className="num">{offer.validUntil ? formatDay(offer.validUntil, locale) : t("time.none")}</td>
                     <td data-label={t("off.total")} className="num end"><bdi>{formatQar(totals.total, locale)}</bdi></td>
@@ -74,6 +85,20 @@ export function OfferScreen() {
                         onClose={() => setMenuId(null)}
                         canManage={canManage}
                         offerId={offer.id}
+                        projectId={offer.projectId}
+                        canCreateProject={canManageProjects}
+                        onCreateProject={() => {
+                          setMenuId(null);
+                          void (async () => {
+                            const result = await createProjectFromOffer(await getToken(), offer.id);
+                            if (!result.ok || !result.id) {
+                              setError(t(result.ok ? "auth.failed" : result.error));
+                              return;
+                            }
+                            setError("");
+                            router.push(`/projects/${result.id}`);
+                          })();
+                        }}
                         onDelete={() => {
                           setMenuId(null);
                           void (async () => {
@@ -101,7 +126,7 @@ export function OfferScreen() {
   );
 }
 
-function RowMenu({ open, onToggle, onClose, canManage, offerId, onDelete }: { open: boolean; onToggle: () => void; onClose: () => void; canManage: boolean; offerId: string; onDelete: () => void }) {
+function RowMenu({ open, onToggle, onClose, canManage, offerId, projectId, canCreateProject, onCreateProject, onDelete }: { open: boolean; onToggle: () => void; onClose: () => void; canManage: boolean; offerId: string; projectId: string; canCreateProject: boolean; onCreateProject: () => void; onDelete: () => void }) {
   const t = useTranslations();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -152,6 +177,8 @@ function RowMenu({ open, onToggle, onClose, canManage, offerId, onDelete }: { op
           <Link role="menuitem" href={`/offers/${offerId}/quotation?print=1`} onClick={onClose}>{t("off.downloadQuote")}</Link>
           <Link role="menuitem" href={`/offers/${offerId}/contract`} onClick={onClose}>{t("off.viewContract")}</Link>
           <Link role="menuitem" href={`/offers/${offerId}/contract?print=1`} onClick={onClose}>{t("off.downloadContract")}</Link>
+          {projectId ? <Link role="menuitem" href={`/projects/${projectId}`} onClick={onClose}>{t("prj.openProject")}</Link> : null}
+          {!projectId && canCreateProject ? <button type="button" role="menuitem" onClick={onCreateProject}>{t("prj.fromOffer")}</button> : null}
           {canManage ? <Link role="menuitem" href={`/offers/${offerId}`} onClick={onClose}>{t("us.edit")}</Link> : null}
           {canManage ? <button type="button" role="menuitem" onClick={onDelete}>{t("us.delete")}</button> : null}
         </div>
