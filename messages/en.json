@@ -37,10 +37,10 @@
   "act3t": "1 h ago",
   "ai": {
     "ask": "Type your answer…",
-    "note": "The assistant only reads and prepares. It never sends email, and nothing is saved until you press Submit.",
+    "note": "The assistant prepares the report. Nothing is saved until you press Submit.",
     "s1": "File today's daily report",
     "title": "ASAS Assistant",
-    "welcome": "Hi! I can fill in today's daily report with you. Tell me the project, or tap a suggestion.",
+    "welcome": "Hi! I'll fill in the daily report with you. Tell me the project, or tap a suggestion.",
     "noAccess": "You need access to Project reports to file reports with the assistant. Ask a Super Admin.",
     "notConfigured": "The AI assistant is not set up yet (missing ANTHROPIC_API_KEY on the server).",
     "tooLong": "This conversation is long. Start a new chat to continue.",
@@ -55,11 +55,17 @@
     "submit": "Submit report",
     "newChat": "New chat",
     "send": "Send",
-    "welcomeBoth": "Hi! I can fill in a daily report with you, or look through the company mailbox. What do you need?",
     "welcomeMail": "Hi! Ask me about the company mailbox, for example a summary of last week's emails.",
     "e1": "Summarise last week's emails",
     "e2": "Emails that need attention or an offer response",
-    "e3": "Unread emails from clients this week"
+    "e3": "Unread emails from clients this week",
+    "titleReports": "Report assistant",
+    "titleMail": "Email assistant",
+    "openReports": "Fill report with AI",
+    "r2": "What details do you need from me?",
+    "noteMail": "Read-only: the assistant never sends, deletes or changes email.",
+    "mailOnlyAdmin": "The email assistant is for Super Admins only.",
+    "mailNotConnected": "The company mailbox is not connected yet. A Super Admin can connect it in Settings > Company mailbox."
   },
   "ann1": {
     "s": "Wed 4 Nov · 07:00 · all site staff",
@@ -488,7 +494,7 @@
   },
   "nav": {
     "accounting": "Accounting",
-    "ai": "AI Assistant",
+    "ai": "Email assistant",
     "assist": "Assist",
     "documents": "Documents",
     "email": "Email",
@@ -870,7 +876,7 @@
     "receipt": "Receipt · ASAS System"
   },
   "top": {
-    "ai": "Open AI assistant",
+    "ai": "Email assistant",
     "menu": "Open menu",
     "notifications": "Notifications",
     "search": "Search people, projects, offers…",

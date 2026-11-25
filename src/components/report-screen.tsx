@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
 import { useReports } from "@/components/use-reports";
 import { WeeklyReports } from "@/components/weekly-reports";
+import { AssistantPanel } from "@/components/assistant-panel";
 import { Tabs } from "@/components/ui/data";
 import { Toast } from "@/components/ui/overlay";
 import { Link } from "@/i18n/navigation";
@@ -21,6 +22,7 @@ export function ReportScreen() {
   const [toast, setToast] = useState<{ title: string; detail: string } | null>(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("daily");
+  const [aiOpen, setAiOpen] = useState(false);
   const notify = (title: string, detail: string) => {
     setToast({ title, detail });
     window.setTimeout(() => setToast(null), 3000);
@@ -38,6 +40,10 @@ export function ReportScreen() {
         </div>
         {canManage ? (
           <div className="hstack page-actions">
+            <button type="button" className="btn btn--secondary" onClick={() => setAiOpen(true)}>
+              <Icon name="spark" />
+              {t("ai.openReports")}
+            </button>
             <Link href="/reports/new" className="btn btn--primary">
               <Icon name="plus" />
               {t("rep.new")}
@@ -107,6 +113,8 @@ export function ReportScreen() {
         </div>
       ) : null}
       <Toast open={Boolean(toast)} title={toast?.title ?? ""} detail={toast?.detail ?? ""} />
+      {/* Report assistant: for people who write daily reports */}
+      {canManage ? <AssistantPanel mode="reports" open={aiOpen} onClose={() => setAiOpen(false)} /> : null}
       </div>
     </AppShell>
   );

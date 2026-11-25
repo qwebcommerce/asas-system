@@ -6,25 +6,28 @@ import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
 import { useReports } from "@/components/use-reports";
 import { Link } from "@/i18n/navigation";
-import { assistantTurn, type AssistantDraft, type AssistantMessage } from "@/server/assistant";
+import { assistantTurn, type AssistantDraft, type AssistantMessage, type AssistantMode } from "@/server/assistant";
 import { createProjectReport } from "@/server/reports";
 
 type History = AssistantMessage[];
 type Bubble = { from: "me" | "ai" | "note"; text: string; reportId?: string };
 
 /**
- * The ASAS Assistant drawer: a chat that collects a daily report and prepares it.
- * The prepared report is shown as a card; nothing is saved until the person presses Submit.
+ * An assistant drawer. Two separate assistants use it:
+ * - mode "reports" (Project reports page): collects a daily report and prepares it; the prepared
+ *   report is shown as a card and nothing is saved until the person presses Submit.
+ * - mode "email" (sidebar, Super Admins only): questions about the company mailbox, read-only.
  */
-export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AssistantPanel({ mode, open, onClose }: { mode: AssistantMode; open: boolean; onClose: () => void }) {
   const t = useTranslations();
   const locale = useLocale();
   const { getToken, profile } = useAuth();
-  const { canManage: canReport, ready } = useReports();
-  // Super Admins can also ask about the company mailbox (connected in Settings)
-  const canMail = profile?.role === "superAdmin";
-  const canManage = canReport || canMail;
-  const chips = [...(canMail ? (["e1", "e2", "e3"] as const) : []), ...(canReport ? (["s1"] as const) : [])];
+  const { canManage: canReport, ready: reportsReady } = useReports();
+  const email = mode === "email";
+  // Reports: people who write daily reports. Email: Super Admins only.
+  const canManage = email ? profile?.role === "superAdmin" : canReport;
+  const ready = email ? Boolean(profile) : reportsReady;
+  const chips = email ? (["e1", "e2", "e3"] as const) : (["s1", "r2"] as const);
   const [history, setHistory] = useState<History>([]);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [draft, setDraft] = useState<AssistantDraft | null>(null);
@@ -49,7 +52,7 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
     setBusy(true);
     setBubbles((current) => [...current, { from: "me", text: clean }]);
     try {
-      const result = await assistantTurn(await getToken(), locale, history, clean);
+      const result = await assistantTurn(await getToken(), mode, locale, history, clean);
       if (!result.ok) {
         setError(t(result.error));
         return;
@@ -96,12 +99,16 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
 
   const title = (en: string, ar: string) => (locale === "ar" ? ar || en : en || ar);
 
+  const titleId = `ai-title-${mode}`;
+
   return (
-    <aside className={`drawer drawer--dark ai-panel${open ? " is-open" : ""}`} role="dialog" aria-modal="true" aria-labelledby="ai-title" inert={!open}>
+    <>
+    <div className={`overlay${open ? " is-open" : ""}`} onClick={onClose} aria-hidden="true" />
+    <aside className={`drawer drawer--dark ai-panel${open ? " is-open" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} inert={!open}>
       <div className="between">
         <div className="hstack" style={{ color: "var(--champagne)" }}>
           <Icon name="spark" className="icon icon--lg" />
-          <h2 id="ai-title" style={{ fontSize: 18, color: "#F2F2F2" }}>{t("ai.title")}</h2>
+          <h2 id={titleId} style={{ fontSize: 18, color: "#F2F2F2" }}>{t(email ? "ai.titleMail" : "ai.titleReports")}</h2>
         </div>
         <div className="hstack">
           {bubbles.length > 0 ? <button type="button" className="ai-panel__new" onClick={restart}>{t("ai.newChat")}</button> : null}
@@ -112,10 +119,10 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
       </div>
 
       <div className="ai-panel__list" ref={list} aria-live="polite">
-        {ready && !canManage ? <p className="ai-bubble ai-bubble--ai">{t("ai.noAccess")}</p> : null}
+        {ready && !canManage ? <p className="ai-bubble ai-bubble--ai">{t(email ? "ai.mailOnlyAdmin" : "ai.noAccess")}</p> : null}
         {canManage && bubbles.length === 0 ? (
           <>
-            <p className="ai-bubble ai-bubble--ai">{t(canMail && canReport ? "ai.welcomeBoth" : canMail ? "ai.welcomeMail" : "ai.welcome")}</p>
+            <p className="ai-bubble ai-bubble--ai">{t(email ? "ai.welcomeMail" : "ai.welcome")}</p>
             <div className="ai-panel__chips">
               {chips.map((id) => (
                 <button key={id} type="button" className="chip ai-chip" onClick={() => void send(t(`ai.${id}`))}>{t(`ai.${id}`)}</button>
@@ -188,7 +195,8 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
           <Icon name="send" className="icon icon--sm" />
         </button>
       </form>
-      <small style={{ color: "var(--steel)", textAlign: "center" }}>{t("ai.note")}</small>
+      <small style={{ color: "var(--steel)", textAlign: "center" }}>{t(email ? "ai.noteMail" : "ai.note")}</small>
     </aside>
+    </>
   );
 }
