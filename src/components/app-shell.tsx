@@ -42,6 +42,7 @@ export function AppShell({
   const { level } = usePermissions();
   const [menuOpen, setMenuOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const isSuperAdmin = profile?.role === "superAdmin";
 
   useEffect(() => {
     if (ready && configured && !user) router.replace("/sign-in");
@@ -91,10 +92,12 @@ export function AppShell({
             ) : null}
           </nav>
           <div className="nav-label">{t("nav.assist")}</div>
-          <button type="button" className="nav-item" onClick={() => setAiOpen(true)}>
-            <Icon name="spark" />
-            <span>{t("nav.ai")}</span>
-          </button>
+          {isSuperAdmin ? (
+            <button type="button" className="nav-item" onClick={() => setAiOpen(true)}>
+              <Icon name="mail" />
+              <span>{t("nav.ai")}</span>
+            </button>
+          ) : null}
           <NavItem
             href="/settings"
             icon="shield"
@@ -139,14 +142,16 @@ export function AppShell({
             </label>
             <LanguageSwitch />
             <ThemeToggle />
-            <button
-              type="button"
-              className="icon-btn icon-btn--ai"
-              aria-label={t("top.ai")}
-              onClick={() => setAiOpen(true)}
-            >
-              <Icon name="spark" />
-            </button>
+            {isSuperAdmin ? (
+              <button
+                type="button"
+                className="icon-btn icon-btn--ai"
+                aria-label={t("top.ai")}
+                onClick={() => setAiOpen(true)}
+              >
+                <Icon name="spark" />
+              </button>
+            ) : null}
             {canViewDocuments ? (
               <Link href="/notifications" className="icon-btn" aria-label={t("top.notifications")}>
                 <Icon name="bell" />
@@ -157,14 +162,9 @@ export function AppShell({
           <main className="content">{children}</main>
         </div>
       </div>
-      <AssistantPanel open={aiOpen} onClose={() => setAiOpen(false)} />
-      <div
-        className={`overlay${menuOpen || aiOpen ? " is-open" : ""}`}
-        onClick={() => {
-          setMenuOpen(false);
-          setAiOpen(false);
-        }}
-      />
+      {/* Email assistant: Super Admins only (the report assistant lives on the Project reports page) */}
+      {isSuperAdmin ? <AssistantPanel mode="email" open={aiOpen} onClose={() => setAiOpen(false)} /> : null}
+      <div className={`overlay${menuOpen ? " is-open" : ""}`} onClick={() => setMenuOpen(false)} />
     </>
   );
 }
