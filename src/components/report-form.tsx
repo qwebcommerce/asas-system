@@ -98,21 +98,26 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
     setItems((current) => current.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   }
 
-  function addFile(file: File | null) {
+  function addFiles(list: File[]) {
     setPickKey((value) => value + 1);
-    if (!file) return;
-    const problem = fileProblem(file.type, file.size, file.name);
-    if (problem) {
-      setFileError(t(problem));
-      return;
-    }
+    if (!list.length) return;
     const savedCount = files.filter((item) => item.reportId === savedId).length;
-    if (savedCount + pending.length >= 10) {
-      setFileError(t("rep.fileLimit"));
-      return;
+    const added: { key: string; file: File }[] = [];
+    let problemText = "";
+    for (const file of list) {
+      const problem = fileProblem(file.type, file.size, file.name);
+      if (problem) {
+        problemText = t(problem);
+        continue;
+      }
+      if (savedCount + pending.length + added.length >= 10) {
+        problemText = t("rep.fileLimit");
+        break;
+      }
+      added.push({ key: crypto.randomUUID(), file });
     }
-    setFileError("");
-    setPending((current) => [...current, { key: crypto.randomUUID(), file }]);
+    setFileError(problemText);
+    setPending((current) => [...current, ...added]);
   }
 
   const saved = files.filter((file) => file.reportId === savedId);
@@ -134,6 +139,11 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
       issues,
       items: items.map(({ area, work, done, status }) => ({ area, work, done, status })),
     };
+    // Every report needs at least one photo or document as proof
+    if (saved.length + pending.length === 0) {
+      setError(t("rep.needProof"));
+      return;
+    }
     setSaving(true);
     const result = savedId
       ? await updateProjectReport(await getToken(), savedId, input)
@@ -294,23 +304,28 @@ function Editor({ initial }: { initial: ProjectReport | null }) {
           <textarea className="textarea" value={issues} onChange={(event) => setIssues(event.target.value)} />
         </div>
         <div className="field">
-          <label>{t("rep.documents")}</label>
+          <label>{t("rep.proof")} <span style={{ color: "var(--danger)" }} aria-hidden="true">*</span></label>
           <label className="file-pick">
             <span className="btn btn--secondary btn--sm">{t("hr.fileChoose")}</span>
             <span className="file-pick__name">{t("hr.fileNone")}</span>
-            <input key={pickKey} type="file" accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => {
-              const next = event.target.files?.[0] ?? null;
+            <input key={pickKey} type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => {
+              const next = Array.from(event.target.files ?? []);
               event.currentTarget.value = "";
-              addFile(next);
+              addFiles(next);
             }} />
           </label>
-          <small className="muted">{t("hr.fileHint")} · {t("rep.fileLimit")}</small>
+          <small className="muted">{t("rep.proofHint")} · {t("hr.fileHint")} · {t("rep.fileLimit")}</small>
           {fileError ? <p style={{ color: "var(--danger)" }}>{fileError}</p> : null}
           {saved.map((file) => (
             <SavedFile
               key={file.id}
               file={file}
               onRemove={() => {
+                // Keep at least one proof on a saved report (add the new one first, then remove)
+                if (saved.length === 1 && pending.length === 0) {
+                  setFileError(t("rep.lastProof"));
+                  return;
+                }
                 void (async () => {
                   const result = await deleteReportFile(await getToken(), file.id);
                   if (!result.ok) setError(t(result.error ?? "auth.failed"));
@@ -356,7 +371,19 @@ function LocalFile({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
     <div className="file-chip">
       {url ? <img className="file-chip__thumb" src={url} alt="" /> : <span className="file-chip__thumb file-chip__thumb--icon"><Icon name="report" /></span>}
-      <div className="grow"><b>{file.name}</b></div>
+      <div className="grow"><b>{file.name}</b><small className="muted" style={{ display: "block" }}>{t("rep.notUploaded")}</small></div>
+      <button
+        type="button"
+        className="btn btn--ghost btn--sm"
+        onClick={() => {
+          // Open the local file (not uploaded yet) in a new tab
+          const local = URL.createObjectURL(file);
+          window.open(local, "_blank", "noopener,noreferrer");
+          window.setTimeout(() => URL.revokeObjectURL(local), 60_000);
+        }}
+      >
+        {t("rep.preview")}
+      </button>
       <button type="button" className="icon-btn file-chip__remove" aria-label={t("hr.fileRemove")} onClick={onRemove}>
         <Icon name="x" className="icon icon--sm" />
       </button>

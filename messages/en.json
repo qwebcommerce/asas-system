@@ -803,7 +803,12 @@
     "needProject": "Choose the project this report is for.",
     "fromOffer": "{count, plural, one {Add items from the offer} other {Add items from the offers}}",
     "fromLast": "Copy items from {date}",
-    "linkedOffers": "Offers for this project:"
+    "linkedOffers": "Offers for this project:",
+    "proof": "Proof (photos or documents)",
+    "proofHint": "At least one site photo or document is required",
+    "needProof": "Attach at least one photo or document as proof.",
+    "lastProof": "A report needs at least one proof. Add another file before removing this one.",
+    "notUploaded": "Uploaded when you save"
   },
   "req": {
     "acc": "Asks for Accounting",
