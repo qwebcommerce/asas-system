@@ -1,4 +1,4 @@
-import { boqPlace, boqRows, boqSectionName, boqWorkName } from "@/lib/boq";
+import { boqEntryCount, boqPlace, boqRows, boqSectionName, boqWorkName } from "@/lib/boq";
 
 export const offerStatuses = ["draft", "sent", "accepted", "rejected", "expired"] as const;
 /** "boq": items of the construction bill of quantities (see src/lib/boq.ts) */
@@ -205,7 +205,54 @@ export type Offer = {
   basement: boolean;
   /** Construction: duration of the works in months (0 when not set) */
   durationMonths: number;
+  /** Construction: waste %, profit % and manpower added to the cost of each BOQ item */
+  costing: OfferCosting;
 };
+
+/**
+ * Costing of a construction offer. Each BOQ item's amount is its cost (quantity × rate) plus
+ * waste (% of cost), its share of the manpower (men × rate per man per month × duration,
+ * split equally over the BOQ items) and profit (% of cost + waste + manpower).
+ */
+export type OfferCosting = { wastePct: number; profitPct: number; men: number; manRate: number };
+
+/** Manpower rate per man per month (QAR) offered by default */
+export const defaultManRate = 1900;
+
+export function defaultCosting(): OfferCosting {
+  return { wastePct: 0, profitPct: 0, men: 0, manRate: defaultManRate };
+}
+
+export type BoqCostInput = OfferCosting & { months: number };
+
+/** The costing to apply to an offer's totals (construction only). */
+export function offerCosting(offer: Pick<Offer, "kind" | "costing" | "durationMonths">): BoqCostInput | null {
+  return offer.kind === "construction" ? { ...offer.costing, months: offer.durationMonths } : null;
+}
+
+export type BoqCost = { qty: number; rate: number; cost: number; waste: number; manpower: number; profit: number; amount: number };
+
+export function manpowerTotal(costing: BoqCostInput) {
+  return Math.max(0, costing.men) * Math.max(0, costing.manRate) * Math.max(0, costing.months);
+}
+
+/** Cost, waste, manpower share, profit and amount (whole QAR) of every BOQ row, by price id. */
+export function boqCosts(lines: OfferLine[], costing: BoqCostInput) {
+  const perItem = manpowerTotal(costing) / boqEntryCount;
+  const costs = new Map<string, BoqCost>();
+  for (const place of boqRows) {
+    const line = lines.find((item) => item.priceId === place.row.id);
+    const qty = line?.qty ?? 0;
+    const rate = line?.rate ?? place.row.rate;
+    const cost = qty * rate;
+    const waste = cost * costing.wastePct / 100;
+    // An item with lettered parts shares its manpower between them
+    const manpower = perItem / place.entry.rows.length;
+    const profit = (cost + waste + manpower) * costing.profitPct / 100;
+    costs.set(place.row.id, { qty, rate, cost, waste, manpower, profit, amount: Math.round(cost + waste + manpower + profit) });
+  }
+  return costs;
+}
 
 export type OfferInput = Omit<Offer, "id" | "number">;
 
@@ -321,8 +368,12 @@ export function totalArea(lines: OfferLine[]) {
 }
 
 /** The offer total is always calculated from its measured rows, less the discount (% or QAR). */
-export function offerTotals(lines: OfferLine[], discount: OfferDiscount) {
-  const subtotal = lines.reduce((sum, line) => sum + lineAmount(line), 0);
+export function offerTotals(lines: OfferLine[], discount: OfferDiscount, costing: BoqCostInput | null = null) {
+  // Construction: the BOQ items' amounts include waste, manpower and profit
+  const subtotal = costing
+    ? [...boqCosts(lines, costing).values()].reduce((sum, item) => sum + item.amount, 0)
+      + lines.filter((line) => line.trade !== "boq").reduce((sum, line) => sum + lineAmount(line), 0)
+    : lines.reduce((sum, line) => sum + lineAmount(line), 0);
   const off = discount.type === "amount"
     ? Math.min(Math.max(0, Math.round(discount.value)), subtotal)
     : Math.round(subtotal * Math.min(Math.max(0, discount.value), 100) / 100);
@@ -344,8 +395,12 @@ export function offerProblem(input: OfferInput) {
   if (input.lines.some((line) => !Number.isInteger(line.units) || line.units < 1 || line.units > 999)) return "off.needUnits";
   if (!discountTypes.includes(input.discount.type) || !Number.isInteger(input.discount.value) || input.discount.value < 0) return "off.badDiscount";
   if (input.discount.type === "percent" && input.discount.value > 100) return "off.badDiscount";
-  if (input.discount.type === "amount" && input.discount.value > offerTotals(input.lines, { type: "percent", value: 0 }).subtotal) return "off.discountHigh";
+  if (input.discount.type === "amount" && input.discount.value > offerTotals(input.lines, { type: "percent", value: 0 }, offerCosting(input)).subtotal) return "off.discountHigh";
   if (input.kind === "construction") {
+    const { wastePct, profitPct, men, manRate } = input.costing;
+    const percent = (value: number) => Number.isFinite(value) && value >= 0 && value <= 100;
+    if (!percent(wastePct) || !percent(profitPct)) return "off.badCostPct";
+    if (!Number.isInteger(men) || men < 0 || men > 999 || !Number.isFinite(manRate) || manRate < 0 || manRate > 100_000) return "off.badManpower";
     if (!input.lines.some((line) => line.trade === "boq" && line.qty > 0)) return "off.needQty";
     if (!Number.isInteger(input.durationMonths) || input.durationMonths < 1 || input.durationMonths > 120) return "off.needDuration";
   }
@@ -443,7 +498,19 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
     validUntil: /^\d{4}-\d{2}-\d{2}$/.test(text(data.validUntil)) ? text(data.validUntil) : "",
     lines,
     basement: data.basement === true,
+    costing: mapCosting(data.costing),
     durationMonths: typeof data.durationMonths === "number" && Number.isInteger(data.durationMonths) && data.durationMonths > 0 ? data.durationMonths : 0,
+  };
+}
+
+function mapCosting(value: unknown): OfferCosting {
+  const stored = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const number = (item: unknown, fallback: number) => (typeof item === "number" && Number.isFinite(item) && item >= 0 ? item : fallback);
+  return {
+    wastePct: number(stored.wastePct, 0),
+    profitPct: number(stored.profitPct, 0),
+    men: Math.round(number(stored.men, 0)),
+    manRate: number(stored.manRate, defaultManRate),
   };
 }
 

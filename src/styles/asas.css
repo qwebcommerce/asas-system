@@ -1149,3 +1149,29 @@ img, svg { display: block; max-width: 100%; }
 .boq-form td .input { min-width: 0; width: 100%; max-width: 120px; }
 .boq-form th:nth-child(4), .boq-form td:nth-child(4), .boq-form th:nth-child(5), .boq-form td:nth-child(5) { width: 120px; }
 .boq-form th:nth-child(6), .boq-form td:nth-child(6) { width: 130px; }
+.costing-sum { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-sunken); font-size: 13.5px; }
+.boq-form th:nth-child(n+6), .boq-form td:nth-child(n+6) { white-space: nowrap; }
+.boq-form th:nth-child(4), .boq-form td:nth-child(4), .boq-form th:nth-child(5), .boq-form td:nth-child(5) { width: 104px; }
+.boq-form th:nth-child(6), .boq-form td:nth-child(6) { width: auto; }
+/* BOQ form, with costing: fixed input widths; waste / manpower / profit stacked in one cell */
+.boq-form { table-layout: auto; }
+.boq-form th:nth-child(1), .boq-form td:nth-child(1) { width: 40px; }
+.boq-form th:nth-child(3), .boq-form td:nth-child(3) { width: 48px; }
+.boq-form th:nth-child(4), .boq-form td:nth-child(4), .boq-form th:nth-child(5), .boq-form td:nth-child(5) { width: 96px; min-width: 96px; }
+.boq-form td:nth-child(4) .input, .boq-form td:nth-child(5) .input { width: 88px; min-width: 88px; max-width: 88px; padding-inline: 8px; }
+.boq-form th:nth-child(6), .boq-form td:nth-child(6) { width: 96px; }
+.boq-form th:nth-child(7), .boq-form td:nth-child(7) { width: 150px; }
+.boq-form th:nth-child(8), .boq-form td:nth-child(8) { width: 104px; }
+.boq-form .boq-form__desc { min-width: 150px; }
+.boq-adds { display: table-cell; font-size: 12px; color: var(--text-2); }
+.boq-adds span { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; }
+.boq-adds i { font-style: normal; color: var(--text-3, #8a8a8a); }
+.boq-form th, .boq-form td { padding-inline: 8px; }
+.boq-form th:nth-child(1), .boq-form td:nth-child(1) { width: 32px; }
+.boq-form th:nth-child(3), .boq-form td:nth-child(3) { width: 40px; }
+.boq-form th:nth-child(4), .boq-form td:nth-child(4), .boq-form th:nth-child(5), .boq-form td:nth-child(5) { width: 84px; min-width: 84px; }
+.boq-form td:nth-child(4) .input, .boq-form td:nth-child(5) .input { width: 76px; min-width: 76px; max-width: 76px; }
+.boq-form th:nth-child(6), .boq-form td:nth-child(6) { width: 150px; }
+.boq-form th:nth-child(7), .boq-form td:nth-child(7) { width: 96px; }
+.boq-form .boq-form__desc { min-width: 120px; }
+.boq-adds b { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
