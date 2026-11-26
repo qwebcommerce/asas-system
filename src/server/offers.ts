@@ -3,7 +3,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import type { ActionResult } from "@/lib/directory";
 import { qatarToday } from "@/lib/hr";
-import { inferShape, isOfferKind, measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, withDesignRates, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
+import { inferShape, isDesignKind, isOfferKind, measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, withDesignRates, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
 import { adminDb } from "@/lib/firebase-admin";
 import { canWriteModule, seesOwn } from "@/lib/access";
 import { projectLink } from "@/server/project-link";
@@ -32,7 +32,8 @@ function clean(input: OfferInput): OfferInput | string {
     const blank = !roomEn && !roomAr && line.l === null && line.w === null && line.h === null && !line.qty;
     if (blank) continue;
     const price = priceById(line.priceId);
-    if (!price || !roomEn || !roomAr) return "us.invalid";
+    // Design offers are priced on the total area only, so their line has no area name
+    if (!price || (!isDesignKind(input.kind) && (!roomEn || !roomAr))) return "us.invalid";
     if (!Number.isFinite(line.rate) || line.rate < 0 || line.rate > 1_000_000) return "us.invalid";
     const l = dim(line.l);
     const w = dim(line.w);

@@ -141,7 +141,15 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
   const designOnly = isDesignKind(kind);
   const [editStages, setEditStages] = useState(!designOnly);
   const [editPayments, setEditPayments] = useState(!designOnly);
-  const [lines, setLines] = useState<DraftLine[]>(() => (initial?.lines.length ? initial.lines.map(toDraft) : [blankLine(isDesignKind(newKind) ? designPriceId(newKind) : "paint")]));
+  const [lines, setLines] = useState<DraftLine[]>(() => {
+    // Design offers: one line holding the total area in m² (no area names); older offers
+    // with several named areas are added up into it
+    if (isDesignKind(kind)) {
+      const sum = initial ? totalArea(initial.lines) : 0;
+      return [{ ...blankLine(designPriceId(kind)), qty: sum ? String(sum) : "", units: "1" }];
+    }
+    return initial?.lines.length ? initial.lines.map(toDraft) : [blankLine("paint")];
+  });
   const [filter, setFilter] = useState<OfferTrade | "all">("all");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -179,6 +187,11 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
 
   async function save() {
     if (saving) return;
+    if (designOnly && area <= 0) {
+      setSavedNote("");
+      setError(t("off.needArea"));
+      return;
+    }
     const input: OfferInput = {
       clientEn,
       clientAr,
@@ -363,13 +376,11 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
             )}
           </div>
           {designOnly ? (
-            <DesignRows
-              lines={lines}
+            <DesignArea
+              value={lines[0]?.qty ?? ""}
               rate={unitRate}
               area={area}
-              onChange={updateLine}
-              onAdd={() => setLines((current) => [...current, blankLine(designPriceId(kind as "architecture" | "interior"))])}
-              onRemove={(key) => setLines((current) => current.filter((item) => item.key !== key))}
+              onChange={(qty) => setLines((current) => current.map((line, index) => (index === 0 ? { ...line, qty, units: "1" } : line)))}
             />
           ) : (
             <>
@@ -655,76 +666,29 @@ function toLine(line: DraftLine): OfferLine | null {
 }
 
 /**
- * Design pricing (architecture and interior): one row per area (e.g. Ground Floor) in m².
- * The unit price is not typed: it comes from the offer's total area (see designRates in
- * src/lib/offers.ts). The rows also make the quotation's scope list.
+ * Design pricing (architecture and interior): only the total area in m² is entered. The unit
+ * price is not typed: it comes from the area (see designRates in src/lib/offers.ts).
  */
-function DesignRows({
-  lines,
-  rate,
-  area,
-  onChange,
-  onAdd,
-  onRemove,
-}: {
-  lines: DraftLine[];
-  rate: number;
-  area: number;
-  onChange: (key: string, patch: Partial<DraftLine>) => void;
-  onAdd: () => void;
-  onRemove: (key: string) => void;
-}) {
+function DesignArea({ value, rate, area, onChange }: { value: string; rate: number; area: number; onChange: (qty: string) => void }) {
   const t = useTranslations();
   const locale = useLocale();
   return (
-    <div className="card card--flush table-wrap">
-      <div className="between" style={{ padding: "16px 18px 4px" }}>
+    <div className="card stack stack--sm">
+      <div className="between">
         <h3 className="card-title">{t("off.areas")}</h3>
         <span className="badge badge--accent"><bdi>{t("off.rateFromArea", { rate: formatQar(rate, locale) })}</bdi></span>
       </div>
-      <p className="muted" style={{ margin: 0, padding: "0 18px 8px", fontSize: 13 }}>{t("off.rateRule")}</p>
-      <table className="table table--cards">
-        <thead>
-          <tr>
-            <th>{t("off.areaName")}</th>
-            <th>{t("off.sqm")}</th>
-            <th className="end">{t("col.total")}</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {lines.length === 0 ? <tr><td colSpan={4}>{t("off.noAreas")}</td></tr> : null}
-          {lines.map((line) => {
-            const sqm = optionalNumber(line.qty) ?? 0;
-            return (
-              <tr key={line.key}>
-                <td data-label={t("off.areaName")}>
-                  <input className="input" placeholder={t("off.areaNameEn")} value={line.roomEn} onChange={(event) => onChange(line.key, { roomEn: event.target.value })} />
-                  <input className="input" dir="rtl" lang="ar" placeholder={t("off.areaNameAr")} value={line.roomAr} onChange={(event) => onChange(line.key, { roomAr: event.target.value })} style={{ marginTop: 6 }} />
-                </td>
-                <td data-label={t("off.sqm")}><input className="input num" type="number" min={0} step="0.1" value={line.qty} onChange={(event) => onChange(line.key, { qty: event.target.value, units: "1" })} /></td>
-                <td data-label={t("col.total")} className="num end strong"><bdi>{formatQar(Math.round(Math.max(0, sqm) * rate), locale)}</bdi></td>
-                <td className="end" data-label="">
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => onRemove(line.key)}>{t("us.delete")}</button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td><b>{t("off.totalArea")}</b></td>
-            <td className="num"><b><bdi>{formatQty(area, locale)} m²</bdi></b></td>
-            <td className="num end"><b><bdi>{formatQar(Math.round(area * rate), locale)}</bdi></b></td>
-            <td />
-          </tr>
-        </tfoot>
-      </table>
-      <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
-        <button type="button" className="link" onClick={onAdd}>
-          <Icon name="plus" className="icon icon--sm" />
-          {t("off.addArea")}
-        </button>
+      <p className="muted" style={{ margin: 0, fontSize: 13 }}>{t("off.rateRule")}</p>
+      <div className="form-grid form-grid--2">
+        <div className="field">
+          <label htmlFor="offer-area">{t("off.totalAreaSqm")}</label>
+          <input id="offer-area" className="input num" type="number" min={0} step="0.1" inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} />
+        </div>
+        <div className="field">
+          <label>{t("col.total")}</label>
+          <b className="num" style={{ fontSize: 18, paddingBlock: 8 }}><bdi>{formatQar(Math.round(area * rate), locale)}</bdi></b>
+          <small className="muted"><bdi>{formatQty(area, locale)} m² × {formatQar(rate, locale)}</bdi></small>
+        </div>
       </div>
     </div>
   );

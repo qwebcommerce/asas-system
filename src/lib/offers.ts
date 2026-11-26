@@ -331,7 +331,8 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
     const price = priceById(text(row.priceId));
     const unit = offerUnits.find((entry) => entry === row.unit) ?? price?.unit;
     const trade = offerTrades.find((entry) => entry === row.trade) ?? price?.trade;
-    if (!unit || !trade || !text(row.roomEn) || !text(row.workEn)) return [];
+    // Design lines (total area only) have no area name
+    if (!unit || !trade || (!text(row.roomEn) && trade !== "design") || !text(row.workEn)) return [];
     const rate = typeof row.rate === "number" && row.rate >= 0 ? row.rate : price?.rate ?? 0;
     const storedQty = typeof row.qty === "number" && row.qty >= 0 ? row.qty : 0;
     return [{
