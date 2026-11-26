@@ -11,7 +11,7 @@ import { useOffers } from "@/components/use-offers";
 import { Toast } from "@/components/ui/overlay";
 import { Link, useRouter } from "@/i18n/navigation";
 import { qatarToday } from "@/lib/hr";
-import { boqCosts, boqLine, defaultCosting, defaultPaymentsFor, manpowerTotal, type BoqCost, type OfferCosting, fitoutUnits, designPriceId, designRate, designStages, discountTypes, isDesignKind, isOfferKind, defaultShape, withDesignRates, lineAmount, lineQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, paymentAmounts, priceById, priceListFor, totalArea, tradesFor, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit, type DiscountType } from "@/lib/offers";
+import { boqLine, defaultCosting, defaultPaymentsFor, lineCosting, manpowerShares, manpowerTotal, type OfferCosting, fitoutUnits, designPriceId, designRate, designStages, discountTypes, isDesignKind, isOfferKind, defaultShape, withDesignRates, lineAmount, lineQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, paymentAmounts, priceById, priceListFor, totalArea, tradesFor, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit, type DiscountType } from "@/lib/offers";
 import { createOffer, updateOffer } from "@/server/offers";
 
 const savedFlag = "asas-offer-saved";
@@ -151,10 +151,11 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
   const [extraLines, setExtraLines] = useState<OfferLine[]>(() => (construction && initial ? initial.lines.filter((line) => line.trade !== "boq") : []));
   const [basement, setBasement] = useState(initial?.basement ?? false);
   const [duration, setDuration] = useState(initial?.durationMonths ? String(initial.durationMonths) : "");
-  // Construction costing: waste %, profit % and manpower, added to each BOQ item
+  // Construction: manpower helper (men × rate per month × duration ÷ BOQ items); each item
+  // has its own waste %, manpower and profit %
   const [costing, setCosting] = useState<CostingDraft>(() => {
     const saved = initial?.costing ?? defaultCosting();
-    return { wastePct: String(saved.wastePct), profitPct: String(saved.profitPct), men: String(saved.men), manRate: String(saved.manRate) };
+    return { men: String(saved.men), manRate: String(saved.manRate) };
   });
   const [lines, setLines] = useState<DraftLine[]>(() => {
     // Design offers: one line holding the total area in m² (no area names); older offers
@@ -175,14 +176,10 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
     ? [...boqLines(boq), ...extraLines]
     : withDesignRates(kind, lines.map(toLine).filter((line): line is OfferLine => line !== null));
   const discountNumber = whole(discountValue, discountType === "percent" ? 100 : 100_000_000);
-  const costingInput: OfferCosting = {
-    wastePct: decimal(costing.wastePct) ?? -1,
-    profitPct: decimal(costing.profitPct) ?? -1,
-    men: whole(costing.men, 999) ?? -1,
-    manRate: decimal(costing.manRate) ?? -1,
-  };
-  const costingNow = { ...costingInput, wastePct: Math.max(0, costingInput.wastePct), profitPct: Math.max(0, costingInput.profitPct), men: Math.max(0, costingInput.men), manRate: Math.max(0, costingInput.manRate), months: whole(duration, 120) ?? 0 };
-  const totals = offerTotals(measured, { type: discountType, value: discountNumber ?? 0 }, construction ? costingNow : null);
+  const costingInput: OfferCosting = { men: whole(costing.men, 999) ?? -1, manRate: decimal(costing.manRate) ?? -1 };
+  const months = whole(duration, 120) ?? 0;
+  const manpower = manpowerTotal({ men: Math.max(0, costingInput.men), manRate: Math.max(0, costingInput.manRate) }, months);
+  const totals = offerTotals(measured, { type: discountType, value: discountNumber ?? 0 });
   const area = totalArea(measured);
   const unitRate = isDesignKind(kind) ? designRate(kind, area) : 0;
   const due = paymentAmounts(totals.total, payments.map((payment) => ({ percent: whole(payment.percent, 100) ?? -1 })));
@@ -419,13 +416,18 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
             <CostingCard
               costing={costing}
               onChange={(patch) => setCosting((current) => ({ ...current, ...patch }))}
-              months={costingNow.months}
-              manpower={manpowerTotal(costingNow)}
+              months={months}
+              manpower={manpower}
+              onSplit={() => {
+                const shares = manpowerShares(manpower);
+                setBoq((current) => Object.fromEntries(Object.entries(current).map(([id, draft]) => [id, { ...draft, manpower: String(shares.get(id) ?? 0) }])));
+              }}
+              onFill={(key, value) => setBoq((current) => Object.fromEntries(Object.entries(current).map(([id, draft]) => [id, { ...draft, [key]: value }])))}
             />
           ) : null}
           {construction ? (
             <BoqTable
-              costs={boqCosts(measured, costingNow)}
+              lines={measured}
               boq={boq}
               onChange={(id, patch) => setBoq((current) => ({ ...current, [id]: { ...current[id], ...patch } }))}
               extraLines={extraLines}
@@ -753,14 +755,14 @@ function DesignArea({ value, rate, area, onChange }: { value: string; rate: numb
   );
 }
 
-type BoqDraft = { qty: string; rate: string };
+type BoqDraft = { qty: string; rate: string; wastePct: string; profitPct: string; manpower: string };
 
 /** BOQ quantities and rates of a construction offer: saved values, or the BOQ rates (lump-sum items at 1). */
 function boqDraft(initial: Offer | null): Record<string, BoqDraft> {
   return Object.fromEntries(boqRows.map(({ row }) => {
     const saved = initial?.lines.find((line) => line.priceId === row.id);
-    if (saved) return [row.id, { qty: String(saved.qty), rate: String(saved.rate) }];
-    return [row.id, { qty: !initial && row.unit === "item" ? "1" : "0", rate: String(row.rate) }];
+    if (saved) return [row.id, { qty: String(saved.qty), rate: String(saved.rate), wastePct: String(saved.wastePct ?? 0), profitPct: String(saved.profitPct ?? 0), manpower: String(saved.manpower ?? 0) }];
+    return [row.id, { qty: !initial && row.unit === "item" ? "1" : "0", rate: String(row.rate), wastePct: "0", profitPct: "0", manpower: "0" }];
   }));
 }
 
@@ -769,7 +771,7 @@ function boqNumber(value: string) {
   return value.trim() !== "" && Number.isFinite(number) && number >= 0 ? number : null;
 }
 
-type CostingDraft = { wastePct: string; profitPct: string; men: string; manRate: string };
+type CostingDraft = { men: string; manRate: string };
 
 function decimal(value: string) {
   const number = Number(value);
@@ -783,40 +785,60 @@ function boqLines(boq: Record<string, BoqDraft>): OfferLine[] {
     const qty = draft ? (draft.qty.trim() === "" ? 0 : boqNumber(draft.qty)) : 0;
     const rate = draft ? boqNumber(draft.rate) : null;
     if (qty === null || rate === null) return [];
-    const line = boqLine(row.id, Math.round(qty * 100) / 100, Math.round(rate * 100) / 100);
+    // An empty extra is 0; an invalid one is sent as -1 so the check names it
+    const extra = (value: string) => (value.trim() === "" ? 0 : decimal(value) ?? -1);
+    const line = boqLine(row.id, Math.round(qty * 100) / 100, Math.round(rate * 100) / 100, {
+      wastePct: extra(draft.wastePct),
+      profitPct: extra(draft.profitPct),
+      manpower: extra(draft.manpower),
+    });
     return line ? [line] : [];
   });
 }
 
 /**
- * Construction costing: waste % and profit % on every BOQ item, and the manpower
- * (men × rate per man per month × duration) split equally over the BOQ items.
+ * Construction costing helpers. Waste %, manpower and profit % are entered on each BOQ item;
+ * this card fills them: the manpower (men × rate per man per month × duration) split equally
+ * over the BOQ items, and a waste % or profit % for every item.
  */
 function CostingCard({
   costing,
   onChange,
   months,
   manpower,
+  onSplit,
+  onFill,
 }: {
   costing: CostingDraft;
   onChange: (patch: Partial<CostingDraft>) => void;
   months: number;
   manpower: number;
+  onSplit: () => void;
+  onFill: (key: "wastePct" | "profitPct", value: string) => void;
 }) {
   const t = useTranslations();
   const locale = useLocale();
+  const [fill, setFill] = useState({ wastePct: "", profitPct: "" });
   const field = (key: keyof CostingDraft, label: string, max?: number, step = "0.01") => (
     <div className="field">
       <label htmlFor={`costing-${key}`}>{label}</label>
       <input id={`costing-${key}`} className="input num" type="number" min={0} max={max} step={step} inputMode="decimal" value={costing[key]} onChange={(event) => onChange({ [key]: event.target.value })} />
     </div>
   );
+  const filler = (key: "wastePct" | "profitPct", label: string) => (
+    <div className="field">
+      <label htmlFor={`fill-${key}`}>{label}</label>
+      <div className="hstack">
+        <input id={`fill-${key}`} className="input num" type="number" min={0} max={100} step="0.01" inputMode="decimal" value={fill[key]} onChange={(event) => setFill((current) => ({ ...current, [key]: event.target.value }))} />
+        <button type="button" className="btn btn--secondary btn--sm" disabled={fill[key].trim() === ""} onClick={() => onFill(key, fill[key])}>{t("off.applyAll")}</button>
+      </div>
+    </div>
+  );
   return (
     <div className="card stack stack--sm">
       <h3 className="card-title">{t("off.costing")}</h3>
+      <p className="muted" style={{ margin: 0, fontSize: 13 }}>{t("off.costingHint")}</p>
       <div className="form-grid form-grid--2">
-        {field("wastePct", t("off.wastePct"), 100)}
-        {field("profitPct", t("off.profitPct"), 100)}
         {field("men", t("off.men"), 999, "1")}
         {field("manRate", t("off.manRate"))}
       </div>
@@ -824,26 +846,32 @@ function CostingCard({
         <bdi>{t("off.manpowerCalc", { men: costing.men || "0", rate: formatQar(Number(costing.manRate) || 0, locale), months })}</bdi>
         <b className="num"><bdi>{formatQar(manpower, locale)}</bdi></b>
         <bdi className="muted">{t("off.manpowerPerItem", { count: boqEntryCount, amount: formatQar(Math.round(manpower / boqEntryCount), locale) })}</bdi>
+        <button type="button" className="btn btn--secondary btn--sm" style={{ marginInlineStart: "auto" }} disabled={manpower <= 0} onClick={onSplit}>{t("off.splitManpower")}</button>
       </div>
       {months === 0 ? <small className="muted">{t("off.manpowerNeedsDuration")}</small> : null}
+      <div className="form-grid form-grid--2">
+        {filler("wastePct", t("off.fillWaste"))}
+        {filler("profitPct", t("off.fillProfit"))}
+      </div>
     </div>
   );
 }
 
 /**
  * Construction measurements: the bill of quantities for construction works, laid out as the
- * company BOQ (sections, numbered items, lettered parts). Every item has a quantity (0 when not
- * used) and a rate starting at the BOQ rate; its amount adds waste, manpower and profit.
+ * company BOQ (sections, numbered items, lettered parts). Each item has a quantity (0 when not
+ * used), a rate starting at the BOQ rate, and its own waste %, manpower and profit %, shown on a
+ * second line under it; the amount adds them to the cost.
  */
 function BoqTable({
-  costs,
+  lines,
   boq,
   onChange,
   extraLines,
   onRemoveExtra,
   subtotal,
 }: {
-  costs: Map<string, BoqCost>;
+  lines: OfferLine[];
   boq: Record<string, BoqDraft>;
   onChange: (id: string, patch: Partial<BoqDraft>) => void;
   extraLines: OfferLine[];
@@ -853,12 +881,26 @@ function BoqTable({
   const t = useTranslations();
   const locale = useLocale();
   const qar = (value: number) => <bdi>{formatQar(Math.round(value), locale)}</bdi>;
-  const sum = (key: keyof BoqCost) => [...costs.values()].reduce((total, item) => total + item[key], 0);
-  const columns = 7;
-  const inputs = (id: string, unit: string) => {
-    const cost = costs.get(id);
-    return (
-      <>
+  const costOf = (id: string) => {
+    const line = lines.find((item) => item.priceId === id);
+    return line ? lineCosting(line) : { cost: 0, waste: 0, manpower: 0, profit: 0, amount: 0 };
+  };
+  const boqCostings = lines.filter((line) => line.trade === "boq").map(lineCosting);
+  const sum = (key: "cost" | "waste" | "manpower" | "profit") => boqCostings.reduce((total, item) => total + item[key], 0);
+  const columns = 6;
+  const small = (id: string, key: "wastePct" | "profitPct" | "manpower", label: string, added: number) => (
+    <label className="boq-extra">
+      <span>{label}</span>
+      <input className="input num" type="number" min={0} max={key === "manpower" ? undefined : 100} step="0.01" inputMode="decimal" value={boq[id]?.[key] ?? ""} onChange={(event) => onChange(id, { [key]: event.target.value })} />
+      <small>+{qar(added)}</small>
+    </label>
+  );
+  const rows = (id: string, unit: string, no: number | null, description: React.ReactNode) => {
+    const cost = costOf(id);
+    return [
+      <tr key={id} className="boq-form__item">
+        <td data-label={t("off.srNo")} className="num">{no ?? ""}</td>
+        <td data-label={t("off.description")}>{description}</td>
         <td data-label={t("col.unit")} className="boq-unit">{boqUnitLabel(unit)}</td>
         <td data-label={t("off.quantity")}>
           <input className="input num" type="number" min={0} step="0.01" inputMode="decimal" aria-label={t("off.quantity")} value={boq[id]?.qty ?? ""} onChange={(event) => onChange(id, { qty: event.target.value })} />
@@ -866,15 +908,20 @@ function BoqTable({
         <td data-label={t("off.rate")}>
           <input className="input num" type="number" min={0} step="0.01" inputMode="decimal" aria-label={t("off.rate")} value={boq[id]?.rate ?? ""} onChange={(event) => onChange(id, { rate: event.target.value })} />
         </td>
-        <td data-label={t("off.cost")} className="boq-adds">
-          <b className="num">{qar(cost?.cost ?? 0)}</b>
-          <span><i>+ {t("off.waste")}</i>{qar(cost?.waste ?? 0)}</span>
-          <span><i>+ {t("off.manpower")}</i>{qar(cost?.manpower ?? 0)}</span>
-          <span><i>+ {t("off.profit")}</i>{qar(cost?.profit ?? 0)}</span>
+        <td data-label={t("off.amount")} className="num end strong" rowSpan={2}>{qar(cost.amount)}</td>
+      </tr>,
+      <tr key={`${id}-costs`} className="boq-form__costs">
+        <td />
+        <td colSpan={4}>
+          <div className="boq-costs">
+            <span className="boq-extra boq-costs__base"><span>{t("off.cost")}</span><b>{qar(cost.cost)}</b></span>
+            {small(id, "wastePct", t("off.wastePct"), cost.waste)}
+            {small(id, "manpower", t("off.manpowerQar"), cost.manpower)}
+            {small(id, "profitPct", t("off.profitPct"), cost.profit)}
+          </div>
         </td>
-        <td data-label={t("off.amount")} className="num end strong">{qar(cost?.amount ?? 0)}</td>
-      </>
-    );
+      </tr>,
+    ];
   };
   return (
     <div className="card card--flush table-wrap">
@@ -890,7 +937,6 @@ function BoqTable({
             <th>{t("col.unit")}</th>
             <th>{t("off.quantity")}</th>
             <th>{t("off.rate")}</th>
-            <th>{t("off.costAndAdditions")}</th>
             <th className="end">{t("off.amount")}</th>
           </tr>
         </thead>
@@ -904,41 +950,24 @@ function BoqTable({
             </tr>
             {section.entries.flatMap((entry) => {
               const head = (
-                <td data-label={t("off.description")}>
-                  <div className="boq-form__desc">
-                    <b>{entry.en}</b>
-                    <span dir="rtl" lang="ar">{entry.ar}</span>
-                  </div>
-                </td>
+                <div className="boq-form__desc">
+                  <b>{entry.en}</b>
+                  <span dir="rtl" lang="ar">{entry.ar}</span>
+                </div>
               );
-              if (!entry.parts) {
-                const row = entry.rows[0];
-                return [
-                  <tr key={row.id}>
-                    <td data-label={t("off.srNo")} className="num">{entry.no}</td>
-                    {head}
-                    {inputs(row.id, row.unit)}
-                  </tr>,
-                ];
-              }
+              if (!entry.parts) return rows(entry.rows[0].id, entry.rows[0].unit, entry.no, head);
               return [
                 <tr key={`${entry.no}-head`} className="boq-form__parent">
                   <td data-label={t("off.srNo")} className="num">{entry.no}</td>
-                  {head}
+                  <td data-label={t("off.description")}>{head}</td>
                   <td colSpan={columns - 2} />
                 </tr>,
-                ...entry.rows.map((row) => (
-                  <tr key={row.id} className="boq-form__part">
-                    <td />
-                    <td data-label={t("off.description")}>
-                      <div className="boq-form__desc">
-                        <span>{row.en}</span>
-                        {row.ar ? <span dir="rtl" lang="ar">{row.ar}</span> : null}
-                      </div>
-                    </td>
-                    {inputs(row.id, row.unit)}
-                  </tr>
-                )),
+                ...entry.rows.flatMap((row) => rows(row.id, row.unit, null, (
+                  <div className="boq-form__desc boq-form__desc--part">
+                    <span>{row.en}</span>
+                    {row.ar ? <span dir="rtl" lang="ar">{row.ar}</span> : null}
+                  </div>
+                ))),
               ];
             })}
           </tbody>
@@ -953,7 +982,6 @@ function BoqTable({
                 <td data-label={t("col.unit")}>{boqUnitLabel(line.unit)}</td>
                 <td data-label={t("off.quantity")} className="num"><bdi>{formatQty(lineQty(line), locale)}</bdi></td>
                 <td data-label={t("off.rate")} className="num"><bdi>{formatQar(line.rate, locale)}</bdi></td>
-                <td />
                 <td className="end">
                   <bdi className="num strong">{formatQar(lineAmount(line), locale)}</bdi>{" "}
                   <button type="button" className="btn btn--ghost btn--sm" onClick={() => onRemoveExtra(index)}>{t("us.delete")}</button>
@@ -965,12 +993,9 @@ function BoqTable({
         <tfoot>
           <tr>
             <td />
-            <td colSpan={4}><b>{t("off.totalAmount")}</b></td>
-            <td className="boq-adds">
-              <b className="num">{qar(sum("cost"))}</b>
-              <span><i>+ {t("off.waste")}</i>{qar(sum("waste"))}</span>
-              <span><i>+ {t("off.manpower")}</i>{qar(sum("manpower"))}</span>
-              <span><i>+ {t("off.profit")}</i>{qar(sum("profit"))}</span>
+            <td colSpan={4}>
+              <b>{t("off.totalAmount")}</b>
+              <div className="boq-costs__adds">{t("off.cost")} {qar(sum("cost"))} · {t("off.waste")} +{qar(sum("waste"))} · {t("off.manpower")} +{qar(sum("manpower"))} · {t("off.profit")} +{qar(sum("profit"))}</div>
             </td>
             <td className="num end"><b>{qar(subtotal)}</b></td>
           </tr>

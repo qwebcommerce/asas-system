@@ -6,7 +6,7 @@ import { canReadAll, canWriteModule } from "@/lib/access";
 import type { ActionResult } from "@/lib/directory";
 import { adminDb } from "@/lib/firebase-admin";
 import { qatarToday } from "@/lib/hr";
-import { isOfferKind, mapOffer, offerCosting, offerTotals } from "@/lib/offers";
+import { isOfferKind, mapOffer, offerTotals } from "@/lib/offers";
 import { isProjectImageSlot, PROJECT_LIMITS, projectImageSlots, projectProblems, projectStatuses, type ProjectImageSlot, type ProjectInput } from "@/lib/projects";
 import { slugify } from "@/lib/website";
 import { removePrivateFile, signedReadUrl } from "@/server/blobs";
@@ -218,7 +218,7 @@ export async function createProjectFromOffer(idToken: string, offerId: string): 
       clientAddressAr: offer.addressAr,
       locationEn: "",
       locationAr: "",
-      budget: offerTotals(offer.lines, offer.discount, offerCosting(offer)).total,
+      budget: offerTotals(offer.lines, offer.discount).total,
       startOn: "",
       endOn: "",
       notesEn: `From offer ${offer.number}`,

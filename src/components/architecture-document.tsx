@@ -8,7 +8,7 @@
  * Interior design offers use the same layout with interior wording (titles and contract scope).
  */
 import { contractTerms } from "@/lib/contract-terms";
-import { letterhead, offerCosting, offerTotals, paymentAmounts, totalArea, type Offer, type OfferPayment } from "@/lib/offers";
+import { letterhead, offerTotals, paymentAmounts, totalArea, type Offer, type OfferPayment } from "@/lib/offers";
 
 type Variant = "quotation" | "contract";
 
@@ -170,7 +170,7 @@ function Payments({
 // ---------------------------------------------------------------- quotation (2 pages)
 
 export function ArchitectureQuotation({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discount, offerCosting(offer));
+  const totals = offerTotals(offer.lines, offer.discount);
   const due = paymentAmounts(totals.total, offer.payments);
   const scopeRows = scopeRowsOf(offer);
   const area = areaOf(offer);
@@ -279,7 +279,7 @@ export function ArchitectureQuotation({ offer }: { offer: Offer }) {
 // ---------------------------------------------------------------- contract (3 pages)
 
 export function ArchitectureContract({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discount, offerCosting(offer));
+  const totals = offerTotals(offer.lines, offer.discount);
   const due = paymentAmounts(totals.total, offer.payments);
   const words = wording(offer);
   const title = words.contract;

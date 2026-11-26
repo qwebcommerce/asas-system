@@ -9,7 +9,7 @@ import { useOffers } from "@/components/use-offers";
 import { useProjects } from "@/components/use-projects";
 import { Toast } from "@/components/ui/overlay";
 import { Link, useRouter } from "@/i18n/navigation";
-import { offerTitle, offerCosting, offerTotals, type OfferStatus } from "@/lib/offers";
+import { offerTitle, offerTotals, type OfferStatus } from "@/lib/offers";
 import { deleteOffer } from "@/server/offers";
 import { createProjectFromOffer } from "@/server/projects";
 
@@ -59,7 +59,7 @@ export function OfferScreen() {
             <tbody>
               {ordered.length === 0 ? <tr><td colSpan={7}>{ready ? t("off.empty") : t("common.loading")}</td></tr> : null}
               {ordered.map((offer) => {
-                const totals = offerTotals(offer.lines, offer.discount, offerCosting(offer));
+                const totals = offerTotals(offer.lines, offer.discount);
                 return (
                   <tr key={offer.id}>
                     <td data-label={t("off.number")} className="num"><bdi>{offer.number}</bdi></td>
