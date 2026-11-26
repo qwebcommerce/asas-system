@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
@@ -34,6 +34,9 @@ export function OfferForm({ offerId, type }: { offerId?: string; type?: string }
   const t = useTranslations();
   const { offers, ready, canManage, canView } = useOffers();
   const offer = offerId ? offers.find((item) => item.id === offerId) : undefined;
+  // Next keeps a page you leave mounted in the background with its state. After a new offer is
+  // saved, the "new" form is reset so that coming back to it can't save the same offer again.
+  const [round, setRound] = useState(0);
 
   if (!canView && ready) {
     return <AppShell title={t("nav.offers")}><p className="muted">{t("off.forbidden")}</p></AppShell>;
@@ -60,7 +63,7 @@ export function OfferForm({ offerId, type }: { offerId?: string; type?: string }
 
   if (!offer && !isOfferKind(type)) return <KindPicker />;
 
-  return <Editor key={offer?.id ?? `new-${type}`} initial={offer ?? null} newKind={isOfferKind(type) ? type : "architecture"} />;
+  return <Editor key={offer?.id ?? `new-${type}-${round}`} initial={offer ?? null} newKind={isOfferKind(type) ? type : "architecture"} onCreated={() => setRound((current) => current + 1)} />;
 }
 
 const kindIcons: Record<OfferKind, string> = {
@@ -103,7 +106,7 @@ function KindPicker() {
   );
 }
 
-function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKind }) {
+function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKind: OfferKind; onCreated?: () => void }) {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
@@ -142,6 +145,8 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
   const [filter, setFilter] = useState<OfferTrade | "all">("all");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  // Id of the offer this form created, so a second save updates it instead of adding another
+  const [createdId, setCreatedId] = useState("");
   const visible = lines.filter((line) => filter === "all" || priceById(line.priceId)?.trade === filter);
   const measured = withDesignRates(kind, lines.map(toLine).filter((line): line is OfferLine => line !== null));
   const discountNumber = whole(discountValue, discountType === "percent" ? 100 : 100_000_000);
@@ -211,22 +216,32 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
       return;
     }
     setSaving(true);
-    const result = initial
-      ? await updateOffer(await getToken(), initial.id, input)
+    const savedId = initial?.id || createdId;
+    const result = savedId
+      ? await updateOffer(await getToken(), savedId, input)
       : await createOffer(await getToken(), input);
-    setSaving(false);
     if (!result.ok) {
+      setSaving(false);
       setError(t(result.error ?? "auth.failed"));
       return;
     }
+    if (!savedId && result.id) {
+      // Open the saved offer in place of the "new" page (Back goes to the list, not to this
+      // filled-in form), and reset the "new" form in the same step
+      const id = result.id;
+      setCreatedId(id);
+      sessionStorage.setItem(savedFlag, "1");
+      startTransition(() => {
+        router.replace(`/offers/${id}`);
+        onCreated?.();
+      });
+      return;
+    }
+    setSaving(false);
     setError("");
     setSavedNote(t("off.saved"));
     setToast(true);
     window.setTimeout(() => setToast(false), 3000);
-    if (!initial && result.id) {
-      sessionStorage.setItem(savedFlag, "1");
-      router.push(`/offers/${result.id}`);
-    }
   }
 
   return (
