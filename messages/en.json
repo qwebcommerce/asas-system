@@ -665,7 +665,7 @@
     "basement": "The project has a basement",
     "paymentsHidden": "Standard payment schedule: {count} payments ({split}). Press Edit to change it for this offer.",
     "boq": "Bill of quantities",
-    "boqHint": "Enter the quantity of each item for this project (0 when not used). Rates are the standard BOQ rates and can be changed. Each amount adds waste, the item's share of the manpower and profit to its cost.",
+    "boqHint": "Enter the quantity of each item for this project (0 when not used). Rates are the standard BOQ rates and can be changed. Under each item, set its waste %, manpower (QAR) and profit %: the amount is cost + waste + manpower + profit (on cost, waste and manpower).",
     "srNo": "Sr. No.",
     "description": "Description",
     "quantity": "Quantity",
@@ -687,9 +687,14 @@
     "waste": "Waste",
     "manpower": "Manpower",
     "profit": "Profit",
-    "badCostPct": "Waste and profit must be between 0 and 100%.",
-    "badManpower": "Enter the manpower as a whole number of men and a rate per month.",
-    "costAndAdditions": "Cost + additions"
+    "badCostPct": "The waste % and profit % of each item must be between 0 and 100.",
+    "badManpower": "Enter valid manpower: a whole number of men, a monthly rate, and a manpower amount of 0 or more on each item.",
+    "costingHint": "Waste %, manpower and profit % are set on each item below. Use these to fill them in one go, then change any item as needed.",
+    "splitManpower": "Split over the 21 items",
+    "fillWaste": "Waste % for every item",
+    "fillProfit": "Profit % for every item",
+    "applyAll": "Apply to all",
+    "manpowerQar": "Manpower (QAR)"
   },
   "ov": {
     "activity": "Recent activity",

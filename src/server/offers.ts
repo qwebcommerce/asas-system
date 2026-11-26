@@ -63,6 +63,8 @@ function clean(input: OfferInput): OfferInput | string {
       shape,
       rate: Math.round(line.rate * 100) / 100,
       units,
+      // Construction BOQ rows: their own waste %, manpower and profit % (checked by offerProblem)
+      ...(price.trade === "boq" ? { wastePct: Number(line.wastePct ?? 0), profitPct: Number(line.profitPct ?? 0), manpower: Number(line.manpower ?? 0) } : {}),
     });
   }
   const stages: OfferStage[] = [];
@@ -107,14 +109,13 @@ function clean(input: OfferInput): OfferInput | string {
     lines: withDesignRates(input.kind, lines).map((line) => {
       // BOQ rows keep their section as the area, whatever the browser sent
       if (line.trade !== "boq") return line;
-      return boqLine(line.priceId, line.qty, line.rate) ?? line;
+      const two = (value: unknown) => Math.round(Number(value ?? 0) * 100) / 100;
+      return boqLine(line.priceId, line.qty, line.rate, { wastePct: two(line.wastePct), profitPct: two(line.profitPct), manpower: two(line.manpower) }) ?? line;
     }),
     basement: construction && input.basement === true,
     durationMonths: construction && Number.isInteger(input.durationMonths) ? input.durationMonths : 0,
     costing: construction && input.costing && typeof input.costing === "object"
       ? {
-          wastePct: Math.round(Number(input.costing.wastePct) * 100) / 100,
-          profitPct: Math.round(Number(input.costing.profitPct) * 100) / 100,
           men: Number(input.costing.men),
           manRate: Math.round(Number(input.costing.manRate) * 100) / 100,
         }
