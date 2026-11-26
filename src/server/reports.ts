@@ -105,6 +105,9 @@ export async function deleteReportFile(idToken: string, fileId: string): Promise
     const reportId = typeof snap.data()?.reportId === "string" ? snap.data()?.reportId : "";
     const who = await manager(idToken, reportId);
     if ("error" in who) return { ok: false, error: who.error };
+    // A report keeps at least one proof photo or document
+    const siblings = await adminDb().collection("reportFiles").where("reportId", "==", reportId).get();
+    if (siblings.size <= 1) return { ok: false, error: "rep.lastProof" };
     const path = snap.data()?.storagePath;
     await ref.delete();
     if (typeof path === "string") await removePrivateFile(path);
