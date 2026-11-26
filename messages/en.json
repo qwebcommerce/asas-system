@@ -40,7 +40,7 @@
     "note": "The assistant prepares the report. Nothing is saved until you press Submit.",
     "s1": "File today's daily report",
     "title": "ASAS Assistant",
-    "welcome": "Hi! I'll fill in the daily report with you. Tell me the project, or tap a suggestion.",
+    "welcome": "Hi! I'll fill in the daily report with you. Tell me the project, or tap a suggestion. Please also attach at least one site photo or document as proof with the camera button.",
     "noAccess": "You need access to Project reports to file reports with the assistant. Ask a Super Admin.",
     "notConfigured": "The AI assistant is not set up yet (missing ANTHROPIC_API_KEY on the server).",
     "tooLong": "This conversation is long. Start a new chat to continue.",
@@ -65,7 +65,18 @@
     "r2": "What details do you need from me?",
     "noteMail": "Read-only: the assistant never sends, deletes or changes email.",
     "mailOnlyAdmin": "The email assistant is for Super Admins only.",
-    "mailNotConnected": "The company mailbox is not connected yet. A Super Admin can connect it in Settings > Company mailbox."
+    "mailNotConnected": "The company mailbox is not connected yet. A Super Admin can connect it in Settings > Company mailbox.",
+    "proof": "Proof",
+    "proofCount": "{count, plural, one {# file attached} other {# files attached}}",
+    "proofMissing": "Attach at least one photo or document",
+    "attach": "Attach proof",
+    "attachHint": "Attach site photos or documents (JPG, PNG, WebP or PDF)",
+    "proofLimit": "You can attach up to {count} files.",
+    "needProof": "Attach at least one photo or document as proof before submitting.",
+    "uploadOnSubmit": "Files are uploaded only when you press Submit.",
+    "proofSaved": "{count, plural, one {# proof file uploaded.} other {# proof files uploaded.}}",
+    "proofFailed": "These files couldn't be uploaded: {files}. Open the report to add them again.",
+    "removeProof": "Remove {name}"
   },
   "ann1": {
     "s": "Wed 4 Nov · 07:00 · all site staff",

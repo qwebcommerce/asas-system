@@ -152,6 +152,9 @@ function systemPrompt(name: string, locale: string, today: string, can: Abilitie
       "- Collect the report: date (default today), weather, main service, number of workers, subcontractors on site, overall progress %, the work done today per area (with % complete and status: complete, progress or waiting), and any issues or delays.",
       "- Ask for missing details a few at a time, in short messages. Suggest the work items from the offer or the last report so the person only has to update the percentages.",
       "- Never invent numbers or work. If something is unknown, ask; if they say there is none, leave it empty.",
+      "- Every report needs proof: at least one site photo or document (JPG, PNG, WebP or PDF). The person attaches files with the camera button next to the message box; each of their messages ends with a note listing the files attached so far. You cannot see the files themselves, only their names, so don't describe what they show.",
+      "- If no file is attached yet, ask for at least one photo or document of today's work (you can ask while collecting the other details). prepare_daily_report is refused until one is attached.",
+      "- Files are only uploaded when the person presses Submit; tell them that if they ask.",
       "- When you have enough, call prepare_daily_report. Then tell them, in one or two sentences, to check the report shown below the chat and press Submit, or tell you what to change.",
     );
   }
@@ -197,7 +200,7 @@ async function projectReports(projectId: string) {
   return snap.docs.flatMap((doc) => mapProjectReport(doc.id, doc.data()) ?? []);
 }
 
-async function runTool(name: string, input: Record<string, unknown>, locale: string, today: string): Promise<{ result: unknown; draft?: AssistantDraft }> {
+async function runTool(name: string, input: Record<string, unknown>, locale: string, today: string, proofs: string[]): Promise<{ result: unknown; draft?: AssistantDraft }> {
   if (name === "list_projects") {
     const projects = await openProjects();
     const rows = await Promise.all(
@@ -239,6 +242,9 @@ async function runTool(name: string, input: Record<string, unknown>, locale: str
   }
 
   if (name === "prepare_daily_report") {
+    if (proofs.length === 0) {
+      return { result: { error: "No proof attached yet. Ask the person to attach at least one photo or document of today's work with the camera button next to the message box, then prepare the report." } };
+    }
     const projectId = typeof input.project_id === "string" ? input.project_id : "";
     const snap = projectId ? await adminDb().collection("projects").doc(projectId).get() : null;
     const project = snap?.exists ? mapProject(snap.id, snap.data() ?? {}) : null;
@@ -296,7 +302,15 @@ export type AssistantMode = "reports" | "email";
  * - "reports" (Project reports page): people who write daily reports; report tools only.
  * - "email" (sidebar): Super Admins only, company mailbox tools only.
  */
-export async function assistantTurn(idToken: string, mode: AssistantMode, locale: string, history: unknown, text: string): Promise<AssistantTurn> {
+export async function assistantTurn(
+  idToken: string,
+  mode: AssistantMode,
+  locale: string,
+  history: unknown,
+  text: string,
+  /** Reports: names of the proof files attached in the chat (they are uploaded only on Submit) */
+  attachments: unknown = [],
+): Promise<AssistantTurn> {
   const who = await actor(idToken);
   if ("error" in who) return { ok: false, error: who.error };
   let can: Abilities;
@@ -321,7 +335,14 @@ export async function assistantTurn(idToken: string, mode: AssistantMode, locale
   const profile = await adminDb().collection("users").doc(who.uid).get();
   const name = typeof profile.data()?.name === "string" ? (profile.data()?.name as string) : "";
   const today = qatarToday();
-  const messages: Message[] = [...history, { role: "user", content: message }];
+  const proofs = Array.isArray(attachments)
+    ? attachments.filter((item): item is string => typeof item === "string").slice(0, 10).map((item) => item.replace(/[\r\n]+/g, " ").slice(0, 120))
+    : [];
+  // Reports: tell Claude which proof files are attached (names only, never the files)
+  const content = can.reports
+    ? `${message}\n\n(${proofs.length ? `Proof attached in the chat: ${proofs.join(", ")}` : "No proof photo or document attached yet"})`
+    : message;
+  const messages: Message[] = [...history, { role: "user", content }];
   const client = new Anthropic();
   let draft: AssistantDraft | null = null;
 
@@ -364,7 +385,7 @@ export async function assistantTurn(idToken: string, mode: AssistantMode, locale
         try {
           // Only the tools offered to this person may run
           if (!tools.some((tool) => tool.name === call.name)) throw new Error("tool not allowed");
-          const outcome = await runTool(call.name, (call.input ?? {}) as Record<string, unknown>, locale, today);
+          const outcome = await runTool(call.name, (call.input ?? {}) as Record<string, unknown>, locale, today, proofs);
           if (outcome.draft) draft = outcome.draft;
           results.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(outcome.result) });
         } catch (error) {
