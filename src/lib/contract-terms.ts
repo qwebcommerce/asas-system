@@ -10,7 +10,12 @@ export type ContractTerm = {
 };
 
 export function contractTerms(kind: OfferKind): ContractTerm[] {
-  const scope = kind === "architecture"
+  const scope = kind === "interior"
+    ? {
+      bodyEn: "The company's services are limited to the design stages in the approved quotation, and include the space planning and concept design, the ceiling, lighting, flooring and wall details, the selection of materials and colours, and the 3D renders. Any additional work requires a separate agreement and price.",
+      bodyAr: "تقتصر خدمات الشركة على مراحل التصميم المحددة في عرض السعر المعتمد، وتشمل مخططات توزيع المساحات والفكرة التصميمية، وتفاصيل الأسقف والإضاءة والأرضيات والجدران، واختيار المواد والألوان، والإظهار ثلاثي الأبعاد (3D Renders). وأي أعمال إضافية تتطلب اتفاقاً وتسعيراً منفصلاً.",
+    }
+    : kind === "architecture"
     ? {
       bodyEn: "The company's services are limited to the design stages in the approved quotation, and include the architectural plans and elevations, the structural and MEP plans, and the 3D renders. Any additional work requires a separate agreement and price.",
       bodyAr: "تقتصر خدمات الشركة على مراحل التصميم المحددة في عرض السعر المعتمد، وتشمل المخططات المعمارية والواجهات، والمخططات الإنشائية والخدمات (MEP)، والإظهار ثلاثي الأبعاد (3D Renders). وأي أعمال إضافية تتطلب اتفاقاً وتسعيراً منفصلاً.",

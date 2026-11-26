@@ -1084,3 +1084,9 @@ img, svg { display: block; max-width: 100%; }
 /* Company mailbox card (Settings) */
 .mail-result { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); font-size: 13.5px; }
 .mail-result--ok { background: var(--ok-bg, #E8F1EB); color: var(--ok, #3F7A57); }
+
+/* Offer form: fixed design stages / payments shown read-only until "Edit" */
+.fixed-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.fixed-list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface-sunken); }
+.fixed-list li > span { grid-column: 1; color: var(--text-2); font-size: 13px; }
+.fixed-list__amount { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-weight: 600; }

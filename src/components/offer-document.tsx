@@ -8,7 +8,7 @@ import { Icon } from "@/components/icon";
 import { useOffers } from "@/components/use-offers";
 import { Link } from "@/i18n/navigation";
 import { contractTerms } from "@/lib/contract-terms";
-import { letterhead, lineAmount, lineQty, offerTotals, paymentAmounts, roomTitle, totalArea, workTitle, type Offer, type OfferKind } from "@/lib/offers";
+import { isDesignKind, letterhead, lineAmount, lineQty, offerTotals, paymentAmounts, roomTitle, totalArea, workTitle, type Offer, type OfferKind } from "@/lib/offers";
 
 export function OfferDocument({ offerId, doc, autoPrint = false }: { offerId: string; doc: "quotation" | "contract"; autoPrint?: boolean }) {
   const t = useTranslations();
@@ -54,7 +54,7 @@ export function OfferDocument({ offerId, doc, autoPrint = false }: { offerId: st
         </button>
       </div>
       <p className="muted no-print">{t("off.printHint")}</p>
-      {offer.kind === "architecture" ? (
+      {isDesignKind(offer.kind) ? (
         <div className="adoc-wrap">
           {doc === "contract" ? <ArchitectureContract offer={offer} /> : <ArchitectureQuotation offer={offer} />}
         </div>
@@ -105,7 +105,7 @@ function Foot({ offer }: { offer: Offer }) {
 }
 
 function QuotationSheets({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discountPct);
+  const totals = offerTotals(offer.lines, offer.discount);
   const due = paymentAmounts(totals.total, offer.payments);
   const { en: title, ar: titleAr } = docTitles[offer.kind].quotation;
   const area = areaLabel(totalArea(offer.lines));
@@ -146,7 +146,7 @@ function QuotationSheets({ offer }: { offer: Offer }) {
         <DocHead offer={offer} enTitle={title} arTitle={titleAr} />
         <section className="doc-totals">
           <div><span>TOTAL AMOUNT | {money(totals.subtotal)} QR</span><span className="sheet-ar">إجمالي المبلغ | {money(totals.subtotal)} ريال قطري</span></div>
-          <div><span>SPECIAL DISCOUNT ({offer.discountPct}%)</span><span className="sheet-ar">خصم امتياز ({offer.discountPct}%)</span></div>
+          <div>{offer.discount.type === "percent" ? <><span>SPECIAL DISCOUNT ({offer.discount.value}%)</span><span className="sheet-ar">خصم امتياز ({offer.discount.value}%)</span></> : <><span>SPECIAL DISCOUNT | {money(totals.discount)} QR</span><span className="sheet-ar">خصم امتياز | {money(totals.discount)} ريال قطري</span></>}</div>
           <div><span>FINAL TOTAL AMOUNT | {money(totals.total)} QR</span><span className="sheet-ar">إجمالي المبلغ النهائي | {money(totals.total)} ريال قطري</span></div>
         </section>
         <Payments offer={offer} due={due} />
@@ -165,7 +165,7 @@ function QuotationSheets({ offer }: { offer: Offer }) {
 }
 
 function ContractSheets({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discountPct);
+  const totals = offerTotals(offer.lines, offer.discount);
   const due = paymentAmounts(totals.total, offer.payments);
   const { en: title, ar: titleAr } = docTitles[offer.kind].contract;
   const area = areaLabel(totalArea(offer.lines));

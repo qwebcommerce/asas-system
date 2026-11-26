@@ -42,7 +42,7 @@ export function OverviewScreen() {
   const activeUsers = users.filter((user) => user.status === "active");
   const roles = new Set(activeUsers.map((user) => user.role)).size;
   const sent = offers.filter((offer) => offer.status === "sent");
-  const sentTotal = sent.reduce((sum, offer) => sum + offerTotals(offer.lines, offer.discountPct).total, 0);
+  const sentTotal = sent.reduce((sum, offer) => sum + offerTotals(offer.lines, offer.discount).total, 0);
   const activeEmployees = employees.filter((employee) => employee.employment === "active");
   const present = activeEmployees.filter((employee) => today[employee.id] === "present").length;
   const late = activeEmployees.filter((employee) => today[employee.id] === "late").length;

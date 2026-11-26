@@ -5,11 +5,30 @@
  * hairline rules and grey bars at the reference positions. Where the reference shows only
  * Arabic (contract parties, scope and terms) only Arabic is shown; elsewhere both languages.
  * Measurements are in points (pt), as in the PDFs. Styles: .adoc in src/styles/asas.css.
+ * Interior design offers use the same layout with interior wording (titles and contract scope).
  */
 import { contractTerms } from "@/lib/contract-terms";
 import { letterhead, offerTotals, paymentAmounts, totalArea, type Offer, type OfferPayment } from "@/lib/offers";
 
 type Variant = "quotation" | "contract";
+
+/** Wording that differs between architecture and interior design offers. */
+function wording(offer: Offer) {
+  if (offer.kind === "interior") {
+    return {
+      quotation: { en: "INTERIOR DESIGN QUOTATION", ar: "عرض سعر تصميم داخلي" },
+      contract: { en: "INTERIOR DESIGN CONTRACT", ar: "عقد تصميم داخلي" },
+      service: "خدمات التصميم الداخلي",
+      works: "وتشمل الأعمال إعداد مخططات توزيع المساحات والفكرة التصميمية، وتصميم تفاصيل الأسقف والإضاءة والأرضيات والجدران واختيار المواد والألوان، بالإضافة إلى إعداد التصاميم ثلاثية الأبعاد (3D Renders) لإظهار الشكل والتصور النهائي للمشروع، وذلك وفقاً لمراحل حزمة التصميم المعتمدة.",
+    };
+  }
+  return {
+    quotation: { en: "ARCHITECTURE DESIGN QUOTATION", ar: "عرض سعر تصميم معماري" },
+    contract: { en: "ARCHITECTURE CONTRACT", ar: "عقد تصميم معماري" },
+    service: "خدمات التصميم المعماري",
+    works: "وتشمل الأعمال إعداد وتطوير المخططات المعمارية والواجهات، وإعداد المخططات الإنشائية ومخططات الخدمات، بالإضافة إلى إعداد التصاميم ثلاثية الأبعاد (3D Renders) لإظهار الشكل والتصور النهائي للمشروع، وذلك وفقاً لمراحل حزمة التصميم المعتمدة وبما يضمن التنسيق والتكامل بين مختلف التخصصات.",
+  };
+}
 
 // ---------------------------------------------------------------- shared pieces
 
@@ -151,11 +170,11 @@ function Payments({
 // ---------------------------------------------------------------- quotation (2 pages)
 
 export function ArchitectureQuotation({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discountPct);
+  const totals = offerTotals(offer.lines, offer.discount);
   const due = paymentAmounts(totals.total, offer.payments);
   const scopeRows = scopeRowsOf(offer);
   const area = areaOf(offer);
-  const title = { en: "ARCHITECTURE DESIGN QUOTATION", ar: "عرض سعر تصميم معماري" };
+  const title = wording(offer).quotation;
   const year = offer.issuedOn.slice(0, 4) || String(new Date().getFullYear());
 
   return (
@@ -208,11 +227,20 @@ export function ArchitectureQuotation({ offer }: { offer: Offer }) {
         <section className="adoc-section adoc-price">
           <Title en={title.en} ar={title.ar} />
           <Bar className="adoc-bar--total" en={<>TOTAL AMOUNT&nbsp; | {money(totals.subtotal)} <small>QR</small></>} ar={<>إجمالي المبلغ | &nbsp;{money(totals.subtotal)}<small>ريال قطري</small></>} />
-          {offer.discountPct > 0 ? (
+          {totals.discount > 0 ? (
             <>
               <div className="adoc-plain adoc-pair">
-                <span className="adoc-en">SPECIAL DISCOUNT ({offer.discountPct}%)</span>
-                <span className="adoc-ar" dir="rtl" lang="ar">خصم إمتياز ({offer.discountPct}%)</span>
+                {offer.discount.type === "percent" ? (
+                  <>
+                    <span className="adoc-en">SPECIAL DISCOUNT ({offer.discount.value}%)</span>
+                    <span className="adoc-ar" dir="rtl" lang="ar">خصم إمتياز ({offer.discount.value}%)</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="adoc-en">SPECIAL DISCOUNT | {money(totals.discount)} QR</span>
+                    <span className="adoc-ar" dir="rtl" lang="ar">خصم إمتياز | {money(totals.discount)} ريال قطري</span>
+                  </>
+                )}
               </div>
               <Bar className="adoc-bar--total" en={<>FINAL TOTAL AMOUNT&nbsp; | {money(totals.total)} <small>QR</small></>} ar={<>إجمالي المبلغ النهائي | &nbsp;{money(totals.total)} <small>ريال قطري</small></>} />
             </>
@@ -251,9 +279,10 @@ export function ArchitectureQuotation({ offer }: { offer: Offer }) {
 // ---------------------------------------------------------------- contract (3 pages)
 
 export function ArchitectureContract({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discountPct);
+  const totals = offerTotals(offer.lines, offer.discount);
   const due = paymentAmounts(totals.total, offer.payments);
-  const title = { en: "ARCHITECTURE CONTRACT", ar: "عقد تصميم معماري" };
+  const words = wording(offer);
+  const title = words.contract;
   const ar = arabicDigits;
   const area = areaOf(offer) ? ar(areaOf(offer)) : "";
   const project = offer.projectAr || "المشروع";
@@ -291,12 +320,10 @@ export function ArchitectureContract({ offer }: { offer: Offer }) {
           <Title en="PROJECT SCOPE" ar="نطاق المشروع" />
           <div className="adoc-prose" dir="rtl" lang="ar">
             <p>
-              يتضمن نطاق هذا المشروع تقديم خدمات التصميم المعماري ل{project}
+              يتضمن نطاق هذا المشروع تقديم {words.service} ل{project}
               {area ? `، وذلك وفقاً للمساحة الإجمالية التقديرية البالغة ${area} متر مربع` : ""}
             </p>
-            <p>
-              وتشمل الأعمال إعداد وتطوير المخططات المعمارية والواجهات، وإعداد المخططات الإنشائية ومخططات الخدمات، بالإضافة إلى إعداد التصاميم ثلاثية الأبعاد (3D Renders) لإظهار الشكل والتصور النهائي للمشروع، وذلك وفقاً لمراحل حزمة التصميم المعتمدة وبما يضمن التنسيق والتكامل بين مختلف التخصصات.
-            </p>
+            <p>{words.works}</p>
           </div>
         </section>
       </Page>
