@@ -1,4 +1,4 @@
-import { boqEntryCount, boqPlace, boqRows, boqSectionName, boqWorkName } from "@/lib/boq";
+import { boqPlace, boqRows, boqSectionName, boqWorkName } from "@/lib/boq";
 
 export const offerStatuses = ["draft", "sent", "accepted", "rejected", "expired"] as const;
 /** "boq": items of the construction bill of quantities (see src/lib/boq.ts) */
@@ -212,32 +212,7 @@ export type Offer = {
   basement: boolean;
   /** Construction: duration of the works in months (0 when not set) */
   durationMonths: number;
-  /** Construction: the manpower helper (men × rate per man per month × duration ÷ BOQ items) */
-  costing: OfferCosting;
 };
-
-/**
- * Manpower helper of a construction offer: men × rate per man per month × duration, split
- * equally over the BOQ items fills each item's manpower (which can then be changed per item).
- */
-export type OfferCosting = { men: number; manRate: number };
-
-/** Manpower rate per man per month (QAR) offered by default */
-export const defaultManRate = 1900;
-
-export function defaultCosting(): OfferCosting {
-  return { men: 0, manRate: defaultManRate };
-}
-
-export function manpowerTotal(costing: OfferCosting, months: number) {
-  return Math.max(0, costing.men) * Math.max(0, costing.manRate) * Math.max(0, months);
-}
-
-/** Manpower of each BOQ row when the total is split equally over the numbered items (parts share their item's share). */
-export function manpowerShares(total: number) {
-  const perItem = total / boqEntryCount;
-  return new Map(boqRows.map((place) => [place.row.id, Math.round(perItem / place.entry.rows.length * 100) / 100]));
-}
 
 export type OfferInput = Omit<Offer, "id" | "number">;
 
@@ -390,11 +365,9 @@ export function offerProblem(input: OfferInput) {
   if (input.discount.type === "percent" && input.discount.value > 100) return "off.badDiscount";
   if (input.discount.type === "amount" && input.discount.value > offerTotals(input.lines, { type: "percent", value: 0 }).subtotal) return "off.discountHigh";
   if (input.kind === "construction") {
-    const { men, manRate } = input.costing;
     const percent = (value: number | undefined) => value === undefined || (Number.isFinite(value) && value >= 0 && value <= 100);
     if (input.lines.some((line) => !percent(line.wastePct) || !percent(line.profitPct))) return "off.badCostPct";
     if (input.lines.some((line) => line.manpower !== undefined && (!Number.isFinite(line.manpower) || line.manpower < 0 || line.manpower > 100_000_000))) return "off.badManpower";
-    if (!Number.isInteger(men) || men < 0 || men > 999 || !Number.isFinite(manRate) || manRate < 0 || manRate > 100_000) return "off.badManpower";
     if (!input.lines.some((line) => line.trade === "boq" && line.qty > 0)) return "off.needQty";
     if (!Number.isInteger(input.durationMonths) || input.durationMonths < 1 || input.durationMonths > 120) return "off.needDuration";
   }
@@ -493,22 +466,12 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
     validUntil: /^\d{4}-\d{2}-\d{2}$/.test(text(data.validUntil)) ? text(data.validUntil) : "",
     lines,
     basement: data.basement === true,
-    costing: mapCosting(data.costing),
     durationMonths: typeof data.durationMonths === "number" && Number.isInteger(data.durationMonths) && data.durationMonths > 0 ? data.durationMonths : 0,
   };
 }
 
 function amount(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
-}
-
-function mapCosting(value: unknown): OfferCosting {
-  const stored = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  const number = (item: unknown, fallback: number) => (typeof item === "number" && Number.isFinite(item) && item >= 0 ? item : fallback);
-  return {
-    men: Math.round(number(stored.men, 0)),
-    manRate: number(stored.manRate, defaultManRate),
-  };
 }
 
 /** Offers saved before the discount type existed stored only a percentage in discountPct. */

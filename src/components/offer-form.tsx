@@ -2,7 +2,7 @@
 
 import { startTransition, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { boqEntryCount, boqRows, boqSections, boqUnitLabel } from "@/lib/boq";
+import { boqRows, boqSections, boqUnitLabel } from "@/lib/boq";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
@@ -11,7 +11,7 @@ import { useOffers } from "@/components/use-offers";
 import { Toast } from "@/components/ui/overlay";
 import { Link, useRouter } from "@/i18n/navigation";
 import { qatarToday } from "@/lib/hr";
-import { boqLine, defaultCosting, defaultPaymentsFor, lineCosting, manpowerShares, manpowerTotal, type OfferCosting, fitoutUnits, designPriceId, designRate, designStages, discountTypes, isDesignKind, isOfferKind, defaultShape, withDesignRates, lineAmount, lineQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, paymentAmounts, priceById, priceListFor, totalArea, tradesFor, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit, type DiscountType } from "@/lib/offers";
+import { boqLine, defaultPaymentsFor, lineCosting, fitoutUnits, designPriceId, designRate, designStages, discountTypes, isDesignKind, isOfferKind, defaultShape, withDesignRates, lineAmount, lineQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, paymentAmounts, priceById, priceListFor, totalArea, tradesFor, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit, type DiscountType } from "@/lib/offers";
 import { createOffer, updateOffer } from "@/server/offers";
 
 const savedFlag = "asas-offer-saved";
@@ -151,12 +151,6 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
   const [extraLines, setExtraLines] = useState<OfferLine[]>(() => (construction && initial ? initial.lines.filter((line) => line.trade !== "boq") : []));
   const [basement, setBasement] = useState(initial?.basement ?? false);
   const [duration, setDuration] = useState(initial?.durationMonths ? String(initial.durationMonths) : "");
-  // Construction: manpower helper (men × rate per month × duration ÷ BOQ items); each item
-  // has its own waste %, manpower and profit %
-  const [costing, setCosting] = useState<CostingDraft>(() => {
-    const saved = initial?.costing ?? defaultCosting();
-    return { men: String(saved.men), manRate: String(saved.manRate) };
-  });
   const [lines, setLines] = useState<DraftLine[]>(() => {
     // Design offers: one line holding the total area in m² (no area names); older offers
     // with several named areas are added up into it
@@ -176,9 +170,6 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
     ? [...boqLines(boq), ...extraLines]
     : withDesignRates(kind, lines.map(toLine).filter((line): line is OfferLine => line !== null));
   const discountNumber = whole(discountValue, discountType === "percent" ? 100 : 100_000_000);
-  const costingInput: OfferCosting = { men: whole(costing.men, 999) ?? -1, manRate: decimal(costing.manRate) ?? -1 };
-  const months = whole(duration, 120) ?? 0;
-  const manpower = manpowerTotal({ men: Math.max(0, costingInput.men), manRate: Math.max(0, costingInput.manRate) }, months);
   const totals = offerTotals(measured, { type: discountType, value: discountNumber ?? 0 });
   const area = totalArea(measured);
   const unitRate = isDesignKind(kind) ? designRate(kind, area) : 0;
@@ -238,7 +229,6 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
       lines: measured,
       basement: construction && basement,
       durationMonths: construction ? whole(duration, 120) ?? -1 : 0,
-      costing: construction ? costingInput : defaultCosting(),
     };
     const problem = offerProblem(input);
     if (problem) {
@@ -412,19 +402,6 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
             )}
           </div>
           )}
-          {construction ? (
-            <CostingCard
-              costing={costing}
-              onChange={(patch) => setCosting((current) => ({ ...current, ...patch }))}
-              months={months}
-              manpower={manpower}
-              onSplit={() => {
-                const shares = manpowerShares(manpower);
-                setBoq((current) => Object.fromEntries(Object.entries(current).map(([id, draft]) => [id, { ...draft, manpower: String(shares.get(id) ?? 0) }])));
-              }}
-              onFill={(key, value) => setBoq((current) => Object.fromEntries(Object.entries(current).map(([id, draft]) => [id, { ...draft, [key]: value }])))}
-            />
-          ) : null}
           {construction ? (
             <BoqTable
               lines={measured}
@@ -771,7 +748,6 @@ function boqNumber(value: string) {
   return value.trim() !== "" && Number.isFinite(number) && number >= 0 ? number : null;
 }
 
-type CostingDraft = { men: string; manRate: string };
 
 function decimal(value: string) {
   const number = Number(value);
@@ -794,67 +770,6 @@ function boqLines(boq: Record<string, BoqDraft>): OfferLine[] {
     });
     return line ? [line] : [];
   });
-}
-
-/**
- * Construction costing helpers. Waste %, manpower and profit % are entered on each BOQ item;
- * this card fills them: the manpower (men × rate per man per month × duration) split equally
- * over the BOQ items, and a waste % or profit % for every item.
- */
-function CostingCard({
-  costing,
-  onChange,
-  months,
-  manpower,
-  onSplit,
-  onFill,
-}: {
-  costing: CostingDraft;
-  onChange: (patch: Partial<CostingDraft>) => void;
-  months: number;
-  manpower: number;
-  onSplit: () => void;
-  onFill: (key: "wastePct" | "profitPct", value: string) => void;
-}) {
-  const t = useTranslations();
-  const locale = useLocale();
-  const [fill, setFill] = useState({ wastePct: "", profitPct: "" });
-  const field = (key: keyof CostingDraft, label: string, max?: number, step = "0.01") => (
-    <div className="field">
-      <label htmlFor={`costing-${key}`}>{label}</label>
-      <input id={`costing-${key}`} className="input num" type="number" min={0} max={max} step={step} inputMode="decimal" value={costing[key]} onChange={(event) => onChange({ [key]: event.target.value })} />
-    </div>
-  );
-  const filler = (key: "wastePct" | "profitPct", label: string) => (
-    <div className="field">
-      <label htmlFor={`fill-${key}`}>{label}</label>
-      <div className="hstack">
-        <input id={`fill-${key}`} className="input num" type="number" min={0} max={100} step="0.01" inputMode="decimal" value={fill[key]} onChange={(event) => setFill((current) => ({ ...current, [key]: event.target.value }))} />
-        <button type="button" className="btn btn--secondary btn--sm" disabled={fill[key].trim() === ""} onClick={() => onFill(key, fill[key])}>{t("off.applyAll")}</button>
-      </div>
-    </div>
-  );
-  return (
-    <div className="card stack stack--sm">
-      <h3 className="card-title">{t("off.costing")}</h3>
-      <p className="muted" style={{ margin: 0, fontSize: 13 }}>{t("off.costingHint")}</p>
-      <div className="form-grid form-grid--2">
-        {field("men", t("off.men"), 999, "1")}
-        {field("manRate", t("off.manRate"))}
-      </div>
-      <div className="costing-sum">
-        <bdi>{t("off.manpowerCalc", { men: costing.men || "0", rate: formatQar(Number(costing.manRate) || 0, locale), months })}</bdi>
-        <b className="num"><bdi>{formatQar(manpower, locale)}</bdi></b>
-        <bdi className="muted">{t("off.manpowerPerItem", { count: boqEntryCount, amount: formatQar(Math.round(manpower / boqEntryCount), locale) })}</bdi>
-        <button type="button" className="btn btn--secondary btn--sm" style={{ marginInlineStart: "auto" }} disabled={manpower <= 0} onClick={onSplit}>{t("off.splitManpower")}</button>
-      </div>
-      {months === 0 ? <small className="muted">{t("off.manpowerNeedsDuration")}</small> : null}
-      <div className="form-grid form-grid--2">
-        {filler("wastePct", t("off.fillWaste"))}
-        {filler("profitPct", t("off.fillProfit"))}
-      </div>
-    </div>
-  );
 }
 
 /**
