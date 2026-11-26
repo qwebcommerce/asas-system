@@ -218,7 +218,7 @@ export async function createProjectFromOffer(idToken: string, offerId: string): 
       clientAddressAr: offer.addressAr,
       locationEn: "",
       locationAr: "",
-      budget: offerTotals(offer.lines, offer.discountPct).total,
+      budget: offerTotals(offer.lines, offer.discount).total,
       startOn: "",
       endOn: "",
       notesEn: `From offer ${offer.number}`,

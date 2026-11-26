@@ -212,7 +212,7 @@ export function ProjectScreen({ projectId }: { projectId: string }) {
                 rows={offers.map((offer) => [
                   <span key="n"><b className="num">{offer.number}</b><small className="muted" style={{ display: "block" }}>{t(`off.${offer.kind}`)} · {offerTitle(offer, locale)}</small></span>,
                   t(`off.${offer.status}`),
-                  <bdi key="a" className="num">{formatQar(offerTotals(offer.lines, offer.discountPct).total, locale)}</bdi>,
+                  <bdi key="a" className="num">{formatQar(offerTotals(offer.lines, offer.discount).total, locale)}</bdi>,
                   <span key="l" className="hstack">
                     <Link href={`/offers/${offer.id}/quotation`} className="btn btn--ghost btn--sm">{t("prj.quotation")}</Link>
                     <Link href={`/offers/${offer.id}/contract`} className="btn btn--secondary btn--sm">{t("prj.contract")}</Link>
@@ -299,7 +299,7 @@ function Overview({ project, offers, reports }: { project: Project; offers: Offe
   const pick = (en: string, ar: string) => (locale === "ar" ? ar || en : en || ar) || "—";
   // Contract value = accepted offers; progress = the latest daily report
   const accepted = offers.filter((offer) => offer.status === "accepted");
-  const contract = accepted.reduce((sum, offer) => sum + offerTotals(offer.lines, offer.discountPct).total, 0);
+  const contract = accepted.reduce((sum, offer) => sum + offerTotals(offer.lines, offer.discount).total, 0);
   const latest = reports[0] ?? null;
   return (
     <div className="grid-2">

@@ -632,7 +632,21 @@
     "addArea": "إضافة مساحة",
     "design": "تصميم",
     "noProject": "غير مرتبط بمشروع",
-    "linkedProject": "المشروع المرتبط"
+    "linkedProject": "المشروع المرتبط",
+    "resetDefault": "استعادة القيم القياسية",
+    "doneEditing": "تم",
+    "noStages": "لا توجد مراحل",
+    "discountType": "نوع الخصم",
+    "discount_percent": "نسبة مئوية",
+    "discount_amount": "مبلغ (ريال)",
+    "discountPercent": "الخصم (%)",
+    "discountAmount": "الخصم (ريال)",
+    "discountResult": "الخصم {amount} · الإجمالي بعد الخصم {total}",
+    "rateFromArea": "{rate} / م²",
+    "rateRule": "أدخل المساحة بالمتر المربع. سعر المتر حسب المساحة الإجمالية: 20 ريال/م² لأقل من 500 م²، و25 ريال/م² من 500 م² فأكثر.",
+    "badDiscount": "أدخل خصماً بعدد صحيح (من 0 إلى 100 للنسبة المئوية).",
+    "discountHigh": "لا يمكن أن يزيد الخصم عن المجموع الفرعي.",
+    "editSection": "تعديل"
   },
   "ov": {
     "activity": "آخر النشاطات",

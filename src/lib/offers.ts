@@ -40,6 +40,47 @@ export type OfferPayment = {
   whenAr: string;
 };
 
+/** Discount on an offer: a percentage of the subtotal or a fixed amount in QAR. */
+export const discountTypes = ["percent", "amount"] as const;
+export type DiscountType = (typeof discountTypes)[number];
+export type OfferDiscount = { type: DiscountType; value: number };
+
+/** Offer types priced per m² of design area, with the same form and documents (architecture layout). */
+export const designKinds = ["architecture", "interior"] as const;
+export type DesignKind = (typeof designKinds)[number];
+
+export function isDesignKind(kind: OfferKind): kind is DesignKind {
+  return designKinds.some((item) => item === kind);
+}
+
+/**
+ * Unit price (QAR per m²) of design offers, set by the offer's TOTAL area.
+ * PLACEHOLDER RATES until the final price lists for architecture and interior design are shared:
+ * below 500 m² → 20, 500 m² and above → 25.
+ */
+export const designRates: Record<DesignKind, { below: number | null; rate: number }[]> = {
+  architecture: [{ below: 500, rate: 20 }, { below: null, rate: 25 }],
+  interior: [{ below: 500, rate: 20 }, { below: null, rate: 25 }],
+};
+
+export function designRate(kind: DesignKind, area: number) {
+  const tiers = designRates[kind];
+  return (tiers.find((tier) => tier.below !== null && area < tier.below) ?? tiers[tiers.length - 1]).rate;
+}
+
+/** Price item used by the area rows of a design offer. */
+export function designPriceId(kind: DesignKind) {
+  return kind === "interior" ? "int-design" : "arch-design";
+}
+
+/** Design offers: every row takes the unit price of the offer's total area (rows count once each). */
+export function withDesignRates(kind: OfferKind, lines: OfferLine[]): OfferLine[] {
+  if (!isDesignKind(kind)) return lines;
+  const rows = lines.map((line) => ({ ...line, units: 1 }));
+  const rate = designRate(kind, totalArea(rows));
+  return rows.map((line) => ({ ...line, rate }));
+}
+
 export const letterhead = {
   company: "ASAS EXECUTION TRADING & CONTRACTING W.L.L.",
   companyAr: "شركة أساس التنفيذية للتجارة والمقاولات",
@@ -73,7 +114,8 @@ export type PriceItem = {
  * will replace these.
  */
 export const priceList: PriceItem[] = [
-  { id: "arch-design", trade: "design", nameEn: "Architectural design", nameAr: "تصميم معماري", unit: "m2", shape: "direct", rate: 40 },
+  { id: "arch-design", trade: "design", nameEn: "Architectural design", nameAr: "تصميم معماري", unit: "m2", shape: "direct", rate: 20 },
+  { id: "int-design", trade: "design", nameEn: "Interior design", nameAr: "تصميم داخلي", unit: "m2", shape: "direct", rate: 20 },
   { id: "paint", trade: "paint", nameEn: "Painting", nameAr: "دهان", unit: "m2", shape: "walls", rate: 28 },
   { id: "gyp", trade: "gyp", nameEn: "Gypsum ceiling", nameAr: "سقف جبس", unit: "m2", shape: "area", rate: 95 },
   { id: "floor", trade: "floor", nameEn: "Porcelain flooring", nameAr: "أرضية بورسلان", unit: "m2", shape: "area", rate: 165 },
@@ -121,7 +163,7 @@ export type Offer = {
   stages: OfferStage[];
   payments: OfferPayment[];
   status: OfferStatus;
-  discountPct: number;
+  discount: OfferDiscount;
   validUntil: string;
   lines: OfferLine[];
 };
@@ -147,14 +189,32 @@ export function architectureStages(): OfferStage[] {
   ];
 }
 
+/**
+ * Interior design package (same structure as architecture; the client's own wording can replace it
+ * per offer with "Edit").
+ */
+export function interiorStages(): OfferStage[] {
+  return [
+    { titleEn: "Stage One", titleAr: "المرحلة الأولى", detailEn: "Space planning and layout\nConcept design", detailAr: "مخططات توزيع المساحات\nالفكرة التصميمية" },
+    { titleEn: "Stage Two", titleAr: "المرحلة الثانية", detailEn: "Ceilings, lighting, flooring and wall details", detailAr: "تفاصيل الأسقف والإضاءة والأرضيات والجدران" },
+    { titleEn: "Stage Three", titleAr: "المرحلة الثالثة", detailEn: "3D Renders", detailAr: "الإظهار الثلاثي الأبعاد" },
+  ];
+}
+
+/** Default design package of a design offer. */
+export function designStages(kind: OfferKind): OfferStage[] {
+  return kind === "interior" ? interiorStages() : kind === "architecture" ? architectureStages() : [];
+}
+
 /** Price items offered for a type of offer. */
 export function priceListFor(kind: OfferKind) {
-  return priceList.filter((item) => (kind === "architecture" ? item.trade === "design" : item.trade !== "design"));
+  if (isDesignKind(kind)) return priceList.filter((item) => item.id === designPriceId(kind));
+  return priceList.filter((item) => item.trade !== "design");
 }
 
 /** Trades shown as filters in the measurement table for a type of offer. */
 export function tradesFor(kind: OfferKind) {
-  return offerTrades.filter((trade) => (kind === "architecture" ? trade === "design" : trade !== "design"));
+  return offerTrades.filter((trade) => (isDesignKind(kind) ? trade === "design" : trade !== "design"));
 }
 
 export function priceById(id: string) {
@@ -199,12 +259,15 @@ export function totalArea(lines: OfferLine[]) {
   return round1(lines.filter((line) => line.unit === "m2").reduce((sum, line) => sum + lineQty(line), 0));
 }
 
-/** The offer total is always calculated from its measured rows. */
-export function offerTotals(lines: OfferLine[], discountPct: number) {
+/** The offer total is always calculated from its measured rows, less the discount (% or QAR). */
+export function offerTotals(lines: OfferLine[], discount: OfferDiscount) {
   const subtotal = lines.reduce((sum, line) => sum + lineAmount(line), 0);
-  const discount = Math.round(subtotal * discountPct / 100);
-  return { subtotal, discount, total: subtotal - discount };
+  const off = discount.type === "amount"
+    ? Math.min(Math.max(0, Math.round(discount.value)), subtotal)
+    : Math.round(subtotal * Math.min(Math.max(0, discount.value), 100) / 100);
+  return { subtotal, discount: off, total: subtotal - off };
 }
+
 
 export function paymentAmounts(total: number, payments: { percent: number }[]) {
   const amounts = payments.map((payment) => Math.round(total * payment.percent / 100));
@@ -218,6 +281,9 @@ export function offerProblem(input: OfferInput) {
   if (input.phone && !/^[0-9+\s()-]{6,20}$/.test(input.phone)) return "off.needPhone";
   if (input.clientId && !/^[0-9]{5,20}$/.test(input.clientId)) return "off.needId";
   if (input.lines.some((line) => !Number.isInteger(line.units) || line.units < 1 || line.units > 999)) return "off.needUnits";
+  if (!discountTypes.includes(input.discount.type) || !Number.isInteger(input.discount.value) || input.discount.value < 0) return "off.badDiscount";
+  if (input.discount.type === "percent" && input.discount.value > 100) return "off.badDiscount";
+  if (input.discount.type === "amount" && input.discount.value > offerTotals(input.lines, { type: "percent", value: 0 }).subtotal) return "off.discountHigh";
   if (input.stages.some((stage) => !stage.titleEn.trim() || !stage.titleAr.trim())) return "off.needStage";
   if (input.payments.length < 1 || input.payments.length > 6) return "off.needPay";
   if (input.payments.some((payment) => !payment.labelEn.trim() || !payment.labelAr.trim() || !payment.whenEn.trim() || !payment.whenAr.trim())) return "off.needPay";
@@ -307,10 +373,18 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
     stages: mapStages(data.stages),
     payments: mapPayments(data.payments),
     status,
-    discountPct: typeof data.discountPct === "number" ? data.discountPct : 0,
+    discount: mapDiscount(data.discount, data.discountPct),
     validUntil: /^\d{4}-\d{2}-\d{2}$/.test(text(data.validUntil)) ? text(data.validUntil) : "",
     lines,
   };
+}
+
+/** Offers saved before the discount type existed stored only a percentage in discountPct. */
+function mapDiscount(value: unknown, legacyPct: unknown): OfferDiscount {
+  const stored = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  const type = discountTypes.find((item) => item === stored?.type);
+  if (stored && type) return { type, value: typeof stored.value === "number" && stored.value >= 0 ? stored.value : 0 };
+  return { type: "percent", value: typeof legacyPct === "number" ? legacyPct : 0 };
 }
 
 function mapStages(value: unknown): OfferStage[] {

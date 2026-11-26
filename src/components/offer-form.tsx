@@ -10,7 +10,7 @@ import { useOffers } from "@/components/use-offers";
 import { Toast } from "@/components/ui/overlay";
 import { Link, useRouter } from "@/i18n/navigation";
 import { qatarToday } from "@/lib/hr";
-import { architectureStages, isOfferKind, defaultShape, defaultPayments, lineAmount, lineQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, offerUnits, paymentAmounts, priceById, priceListFor, totalArea, tradesFor, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit } from "@/lib/offers";
+import { designPriceId, designRate, designStages, discountTypes, isDesignKind, isOfferKind, defaultShape, defaultPayments, withDesignRates, lineAmount, lineQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, offerUnits, paymentAmounts, priceById, priceListFor, totalArea, tradesFor, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit, type DiscountType } from "@/lib/offers";
 import { createOffer, updateOffer } from "@/server/offers";
 
 const savedFlag = "asas-offer-saved";
@@ -113,7 +113,8 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
   const [projectEn, setProjectEn] = useState(initial?.projectEn ?? "");
   const [projectAr, setProjectAr] = useState(initial?.projectAr ?? "");
   const [status, setStatus] = useState<OfferStatus>(initial?.status ?? "draft");
-  const [discountPct, setDiscountPct] = useState(String(initial?.discountPct ?? 5));
+  const [discountType, setDiscountType] = useState<DiscountType>(initial?.discount.type ?? "percent");
+  const [discountValue, setDiscountValue] = useState(String(initial?.discount.value ?? 5));
   const [validUntil, setValidUntil] = useState(initial?.validUntil || plusDays(qatarToday(), 30));
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [clientId, setClientId] = useState(initial?.clientId ?? "");
@@ -128,19 +129,25 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
   const [projectId, setProjectId] = useState(initial?.projectId ?? "");
   const [scopeEn, setScopeEn] = useState(initial?.scopeEn ?? "");
   const [scopeAr, setScopeAr] = useState(initial?.scopeAr ?? "");
-  const [stages, setStages] = useState<StageDraft[]>(() => (initial ? initial.stages : newKind === "architecture" ? architectureStages() : []).map(stageDraft));
+  const [stages, setStages] = useState<StageDraft[]>(() => (initial ? initial.stages : designStages(newKind)).map(stageDraft));
   const [payments, setPayments] = useState<PayDraft[]>(() => (initial?.payments?.length ? initial.payments : defaultPayments()).map(payDraft));
   const [savedNote, setSavedNote] = useState("");
   const [toast, setToast] = useState(false);
-  const designOnly = kind === "architecture";
-  const [lines, setLines] = useState<DraftLine[]>(() => (initial?.lines.length ? initial.lines.map(toDraft) : [blankLine(designOnly ? "arch-design" : "paint")]));
+  // Architecture and interior design: area rows in m², unit price from the total area,
+  // fixed design package and payments (shown read-only until "Edit")
+  const designOnly = isDesignKind(kind);
+  const [editStages, setEditStages] = useState(!designOnly);
+  const [editPayments, setEditPayments] = useState(!designOnly);
+  const [lines, setLines] = useState<DraftLine[]>(() => (initial?.lines.length ? initial.lines.map(toDraft) : [blankLine(isDesignKind(newKind) ? designPriceId(newKind) : "paint")]));
   const [filter, setFilter] = useState<OfferTrade | "all">("all");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const visible = lines.filter((line) => filter === "all" || priceById(line.priceId)?.trade === filter);
-  const measured = lines.map(toLine).filter((line): line is OfferLine => line !== null);
-  const totals = offerTotals(measured, whole(discountPct, 100) ?? 0);
+  const measured = withDesignRates(kind, lines.map(toLine).filter((line): line is OfferLine => line !== null));
+  const discountNumber = whole(discountValue, discountType === "percent" ? 100 : 100_000_000);
+  const totals = offerTotals(measured, { type: discountType, value: discountNumber ?? 0 });
   const area = totalArea(measured);
+  const unitRate = isDesignKind(kind) ? designRate(kind, area) : 0;
   const due = paymentAmounts(totals.total, payments.map((payment) => ({ percent: whole(payment.percent, 100) ?? -1 })));
 
   useEffect(() => {
@@ -167,7 +174,6 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
 
   async function save() {
     if (saving) return;
-    const discount = whole(discountPct, 100);
     const input: OfferInput = {
       clientEn,
       clientAr,
@@ -188,17 +194,20 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
       stages: stages.map(toStage).filter((stage) => stage.titleEn || stage.titleAr || stage.detailEn || stage.detailAr),
       payments: payments.map(toPayment),
       status,
-      discountPct: discount ?? -1,
+      discount: { type: discountType, value: discountNumber ?? -1 },
       validUntil,
-      lines: lines.flatMap((line) => {
+      lines: withDesignRates(kind, lines.flatMap((line) => {
         const next = toLine(line);
         return next ? [next] : [];
-      }),
+      })),
     };
     const problem = offerProblem(input);
     if (problem) {
       setSavedNote("");
       setError(t(problem));
+      // Open the fixed sections when the problem is in them
+      if (problem === "off.needStage") setEditStages(true);
+      if (problem === "off.needPay" || problem === "off.payTotal") setEditPayments(true);
       return;
     }
     setSaving(true);
@@ -279,7 +288,6 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
                   {offerStatuses.map((item) => <option key={item} value={item}>{t(`off.${item}`)}</option>)}
                 </select>
               </div>
-              <Field label={t("off.discount")} value={discountPct} onChange={setDiscountPct} type="number" />
               <Field label={t("off.validUntil")} value={validUntil} onChange={setValidUntil} type="date" />
               <Field label={t("off.phone")} value={phone} onChange={setPhone} />
               <Field label={t("off.clientId")} value={clientId} onChange={setClientId} />
@@ -300,26 +308,54 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
           <div className="card stack">
             <div className="between">
               <h3 className="card-title">{t("off.stages")}</h3>
-              <button type="button" className="btn btn--secondary btn--sm" onClick={() => setStages(architectureStages().map(stageDraft))}>{t("off.stageTemplate")}</button>
-            </div>
-            {stages.map((stage) => (
-              <div className="stack stack--sm" key={stage.key}>
-                <div className="form-grid form-grid--2">
-                  <Field label={t("off.stageTitle")} value={stage.titleEn} onChange={(titleEn) => patchStage(stage.key, { titleEn })} />
-                  <Field label={t("off.stageTitleAr")} value={stage.titleAr} onChange={(titleAr) => patchStage(stage.key, { titleAr })} />
-                </div>
-                <Field label={t("off.stageDetail")} value={stage.detailEn} onChange={(detailEn) => patchStage(stage.key, { detailEn })} area />
-                <Field label={t("off.stageDetailAr")} value={stage.detailAr} onChange={(detailAr) => patchStage(stage.key, { detailAr })} area />
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setStages((current) => current.filter((item) => item.key !== stage.key))}>{t("us.delete")}</button>
+              <div className="hstack">
+                {editStages && isDesignKind(kind) ? <button type="button" className="btn btn--ghost btn--sm" onClick={() => setStages(designStages(kind).map(stageDraft))}>{t("off.resetDefault")}</button> : null}
+                {designOnly ? (
+                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditStages((open) => !open)}>
+                    {editStages ? t("off.doneEditing") : <><Icon name="ruler" className="icon icon--sm" />{t("off.editSection")}</>}
+                  </button>
+                ) : null}
               </div>
-            ))}
-            <button type="button" className="link" onClick={() => setStages((current) => [...current, stageDraft({ titleEn: "", titleAr: "", detailEn: "", detailAr: "" })])}>
-              <Icon name="plus" className="icon icon--sm" />
-              {t("off.stageAdd")}
-            </button>
+            </div>
+            {!editStages ? (
+              <ul className="fixed-list">
+                {stages.map((stage) => (
+                  <li key={stage.key}>
+                    <b>{locale === "ar" ? stage.titleAr || stage.titleEn : stage.titleEn || stage.titleAr}</b>
+                    <span>{(locale === "ar" ? stage.detailAr || stage.detailEn : stage.detailEn || stage.detailAr).split("\n").join(" · ")}</span>
+                  </li>
+                ))}
+                {stages.length === 0 ? <li className="muted">{t("off.noStages")}</li> : null}
+              </ul>
+            ) : (
+              <>
+                {stages.map((stage) => (
+                  <div className="stack stack--sm" key={stage.key}>
+                    <div className="form-grid form-grid--2">
+                      <Field label={t("off.stageTitle")} value={stage.titleEn} onChange={(titleEn) => patchStage(stage.key, { titleEn })} />
+                      <Field label={t("off.stageTitleAr")} value={stage.titleAr} onChange={(titleAr) => patchStage(stage.key, { titleAr })} />
+                    </div>
+                    <Field label={t("off.stageDetail")} value={stage.detailEn} onChange={(detailEn) => patchStage(stage.key, { detailEn })} area />
+                    <Field label={t("off.stageDetailAr")} value={stage.detailAr} onChange={(detailAr) => patchStage(stage.key, { detailAr })} area />
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => setStages((current) => current.filter((item) => item.key !== stage.key))}>{t("us.delete")}</button>
+                  </div>
+                ))}
+                <button type="button" className="link" onClick={() => setStages((current) => [...current, stageDraft({ titleEn: "", titleAr: "", detailEn: "", detailAr: "" })])}>
+                  <Icon name="plus" className="icon icon--sm" />
+                  {t("off.stageAdd")}
+                </button>
+              </>
+            )}
           </div>
           {designOnly ? (
-            <DesignRows lines={lines} onChange={updateLine} onAdd={() => setLines((current) => [...current, blankLine("arch-design")])} onRemove={(key) => setLines((current) => current.filter((item) => item.key !== key))} />
+            <DesignRows
+              lines={lines}
+              rate={unitRate}
+              area={area}
+              onChange={updateLine}
+              onAdd={() => setLines((current) => [...current, blankLine(designPriceId(kind as "architecture" | "interior"))])}
+              onRemove={(key) => setLines((current) => current.filter((item) => item.key !== key))}
+            />
           ) : (
             <>
             <div className="hstack">
@@ -418,13 +454,31 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
             </div>
             </>
           )}
-          <p className="muted">{t("off.ratesNote")}</p>
+          {designOnly ? null : <p className="muted">{t("off.ratesNote")}</p>}
           <div className="card stack">
             <div className="between">
               <h3 className="card-title">{t("off.payments")}</h3>
-              <button type="button" className="btn btn--secondary btn--sm" onClick={() => setPayments((current) => [...current, payDraft({ labelEn: "", labelAr: "", percent: 0, whenEn: "", whenAr: "" })])}>{t("off.payAdd")}</button>
+              <div className="hstack">
+                {editPayments ? <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPayments((current) => [...current, payDraft({ labelEn: "", labelAr: "", percent: 0, whenEn: "", whenAr: "" })])}>{t("off.payAdd")}</button> : null}
+                {editPayments && designOnly ? <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPayments(defaultPayments().map(payDraft))}>{t("off.resetDefault")}</button> : null}
+                {designOnly ? (
+                  <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditPayments((open) => !open)}>
+                    {editPayments ? t("off.doneEditing") : <><Icon name="ruler" className="icon icon--sm" />{t("off.editSection")}</>}
+                  </button>
+                ) : null}
+              </div>
             </div>
-            {payments.map((payment, index) => (
+            {!editPayments ? (
+              <ul className="fixed-list">
+                {payments.map((payment, index) => (
+                  <li key={payment.key}>
+                    <b>{locale === "ar" ? payment.labelAr || payment.labelEn : payment.labelEn || payment.labelAr} · <bdi className="num">{payment.percent}%</bdi></b>
+                    <span>{locale === "ar" ? payment.whenAr || payment.whenEn : payment.whenEn || payment.whenAr}</span>
+                    <bdi className="num fixed-list__amount">{formatQar(Math.max(0, due[index] ?? 0), locale)}</bdi>
+                  </li>
+                ))}
+              </ul>
+            ) : payments.map((payment, index) => (
               <div className="stack stack--sm" key={payment.key}>
                 <div className="form-grid form-grid--2">
                   <Field label={t("off.payLabel")} value={payment.labelEn} onChange={(labelEn) => patchPay(payment.key, { labelEn })} />
@@ -441,6 +495,25 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
               </div>
             ))}
           </div>
+          {/* Discount comes last: a percentage of the subtotal or a fixed amount */}
+          <div className="card stack stack--sm">
+            <h3 className="card-title">{t("off.discount")}</h3>
+            <div className="form-grid form-grid--2">
+              <div className="field">
+                <label>{t("off.discountType")}</label>
+                <div className="segmented" role="group" aria-label={t("off.discountType")}>
+                  {discountTypes.map((type) => (
+                    <button key={type} type="button" aria-pressed={discountType === type} onClick={() => setDiscountType(type)}>{t(`off.discount_${type}`)}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="offer-discount">{discountType === "percent" ? t("off.discountPercent") : t("off.discountAmount")}</label>
+                <input id="offer-discount" className="input num" type="number" min={0} max={discountType === "percent" ? 100 : undefined} step="1" value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} />
+              </div>
+            </div>
+            <small className="muted"><bdi>{t("off.discountResult", { amount: formatQar(totals.discount, locale), total: formatQar(totals.total, locale) })}</bdi></small>
+          </div>
         </div>
         <div className="card stack stack--sm">
           <h3 className="card-title">{t("off.summary")}</h3>
@@ -448,7 +521,8 @@ function Editor({ initial, newKind }: { initial: Offer | null; newKind: OfferKin
           <div className="kv"><span>{t("off.items")}</span><span className="num">{measured.length}</span></div>
           {area > 0 ? <div className="kv"><span>{t("off.totalArea")}</span><span className="num"><bdi>{formatQty(area, locale)} m²</bdi></span></div> : null}
           <div className="kv"><span>{t("off.subtotal")}</span><span className="num"><bdi>{formatQar(totals.subtotal, locale)}</bdi></span></div>
-          <div className="kv"><span>{t("off.discount")} <bdi className="num">{whole(discountPct, 100) ?? 0}%</bdi></span><span className="num"><bdi>− {formatQar(totals.discount, locale)}</bdi></span></div>
+          {designOnly && area > 0 ? <div className="kv"><span>{t("off.unitPrice")}</span><span className="num"><bdi>{formatQar(unitRate, locale)} / m²</bdi></span></div> : null}
+          <div className="kv"><span>{t("off.discount")}{discountType === "percent" ? <> <bdi className="num">{discountNumber ?? 0}%</bdi></> : null}</span><span className="num"><bdi>− {formatQar(totals.discount, locale)}</bdi></span></div>
           <div className="total">
             <b>{t("off.total")}</b>
             <strong className="num"><bdi>{formatQar(totals.total, locale)}</bdi></strong>
@@ -566,16 +640,21 @@ function toLine(line: DraftLine): OfferLine | null {
 }
 
 /**
- * Architectural design pricing: one row per area (e.g. Ground Floor), in m², times the number
- * of identical units, times the unit price per m². The rows also make the quotation's scope list.
+ * Design pricing (architecture and interior): one row per area (e.g. Ground Floor) in m².
+ * The unit price is not typed: it comes from the offer's total area (see designRates in
+ * src/lib/offers.ts). The rows also make the quotation's scope list.
  */
 function DesignRows({
   lines,
+  rate,
+  area,
   onChange,
   onAdd,
   onRemove,
 }: {
   lines: DraftLine[];
+  rate: number;
+  area: number;
   onChange: (key: string, patch: Partial<DraftLine>) => void;
   onAdd: () => void;
   onRemove: (key: string) => void;
@@ -586,35 +665,30 @@ function DesignRows({
     <div className="card card--flush table-wrap">
       <div className="between" style={{ padding: "16px 18px 4px" }}>
         <h3 className="card-title">{t("off.areas")}</h3>
+        <span className="badge badge--accent"><bdi>{t("off.rateFromArea", { rate: formatQar(rate, locale) })}</bdi></span>
       </div>
+      <p className="muted" style={{ margin: 0, padding: "0 18px 8px", fontSize: 13 }}>{t("off.rateRule")}</p>
       <table className="table table--cards">
         <thead>
           <tr>
             <th>{t("off.areaName")}</th>
             <th>{t("off.sqm")}</th>
-            <th>{t("off.units")}</th>
-            <th>{t("off.unitPrice")}</th>
             <th className="end">{t("col.total")}</th>
             <th />
           </tr>
         </thead>
         <tbody>
-          {lines.length === 0 ? <tr><td colSpan={6}>{t("off.noAreas")}</td></tr> : null}
+          {lines.length === 0 ? <tr><td colSpan={4}>{t("off.noAreas")}</td></tr> : null}
           {lines.map((line) => {
-            const row = toLine(line);
+            const sqm = optionalNumber(line.qty) ?? 0;
             return (
               <tr key={line.key}>
                 <td data-label={t("off.areaName")}>
                   <input className="input" placeholder={t("off.areaNameEn")} value={line.roomEn} onChange={(event) => onChange(line.key, { roomEn: event.target.value })} />
                   <input className="input" dir="rtl" lang="ar" placeholder={t("off.areaNameAr")} value={line.roomAr} onChange={(event) => onChange(line.key, { roomAr: event.target.value })} style={{ marginTop: 6 }} />
                 </td>
-                <td data-label={t("off.sqm")}><input className="input num" type="number" min={0} step="0.1" value={line.qty} onChange={(event) => onChange(line.key, { qty: event.target.value })} /></td>
-                <td data-label={t("off.units")}><input className="input num" type="number" min={1} max={999} step="1" value={line.units} onChange={(event) => onChange(line.key, { units: event.target.value })} /></td>
-                <td data-label={t("off.unitPrice")}><input className="input num" type="number" min={0} step="0.01" value={line.rate} onChange={(event) => onChange(line.key, { rate: event.target.value })} /></td>
-                <td data-label={t("col.total")} className="num end strong">
-                  <bdi>{formatQar(row ? lineAmount(row) : 0, locale)}</bdi>
-                  {row && lineQty(row) > 0 ? <small className="muted" style={{ display: "block" }}><bdi>{formatQty(lineQty(row), locale)} m²</bdi></small> : null}
-                </td>
+                <td data-label={t("off.sqm")}><input className="input num" type="number" min={0} step="0.1" value={line.qty} onChange={(event) => onChange(line.key, { qty: event.target.value, units: "1" })} /></td>
+                <td data-label={t("col.total")} className="num end strong"><bdi>{formatQar(Math.round(Math.max(0, sqm) * rate), locale)}</bdi></td>
                 <td className="end" data-label="">
                   <button type="button" className="btn btn--ghost btn--sm" onClick={() => onRemove(line.key)}>{t("us.delete")}</button>
                 </td>
@@ -622,6 +696,14 @@ function DesignRows({
             );
           })}
         </tbody>
+        <tfoot>
+          <tr>
+            <td><b>{t("off.totalArea")}</b></td>
+            <td className="num"><b><bdi>{formatQty(area, locale)} m²</bdi></b></td>
+            <td className="num end"><b><bdi>{formatQar(Math.round(area * rate), locale)}</bdi></b></td>
+            <td />
+          </tr>
+        </tfoot>
       </table>
       <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)" }}>
         <button type="button" className="link" onClick={onAdd}>

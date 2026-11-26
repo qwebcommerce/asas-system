@@ -3,7 +3,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import type { ActionResult } from "@/lib/directory";
 import { qatarToday } from "@/lib/hr";
-import { inferShape, measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
+import { inferShape, isOfferKind, measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, withDesignRates, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
 import { adminDb } from "@/lib/firebase-admin";
 import { canWriteModule, seesOwn } from "@/lib/access";
 import { projectLink } from "@/server/project-link";
@@ -23,7 +23,7 @@ function clean(input: OfferInput): OfferInput | string {
   const validUntil = /^\d{4}-\d{2}-\d{2}$/.test(input.validUntil) ? input.validUntil : "";
   if (!clientEn || !clientAr || !projectEn || !projectAr || !validUntil || !offerStatuses.includes(input.status)) return "us.invalid";
   if (!offerKinds.includes(input.kind)) return "us.invalid";
-  if (!Number.isInteger(input.discountPct) || input.discountPct < 0 || input.discountPct > 100) return "us.invalid";
+  if (!input.discount || typeof input.discount !== "object") return "us.invalid";
   if (!Array.isArray(input.lines) || input.lines.length > 80) return "us.invalid";
   const lines: OfferLine[] = [];
   for (const line of input.lines) {
@@ -98,9 +98,10 @@ function clean(input: OfferInput): OfferInput | string {
     stages,
     payments,
     status: input.status,
-    discountPct: input.discountPct,
+    discount: { type: input.discount.type, value: input.discount.value },
     validUntil,
-    lines,
+    // Design offers: the unit price comes from the total area, whatever the browser sent
+    lines: withDesignRates(input.kind, lines),
   };
   const problem = offerProblem(offer);
   return problem || offer;
@@ -161,15 +162,15 @@ export async function updateOffer(idToken: string, offerId: string, input: Offer
   try {
     const who = await manager(idToken, offerId);
     if ("error" in who) return { ok: false, error: who.error };
-    const offer = clean(input);
-    if (typeof offer === "string") return { ok: false, error: offer };
-    if (offer.projectId && !(await projectLink(offer.projectId))) return { ok: false, error: "prj.missingProject" };
     const ref = adminDb().collection("offers").doc(offerId);
     const snap = await ref.get();
     if (!snap.exists) return { ok: false, error: "us.invalid" };
-    // The offer type is fixed once created (each type has its own fields and documents)
+    // The offer type is fixed once created (each type has its own fields, prices and documents)
     const storedKind = snap.data()?.kind;
-    await ref.update({ ...offer, kind: typeof storedKind === "string" ? storedKind : offer.kind, updatedAt: FieldValue.serverTimestamp() });
+    const offer = clean({ ...input, kind: isOfferKind(storedKind) ? storedKind : input.kind });
+    if (typeof offer === "string") return { ok: false, error: offer };
+    if (offer.projectId && !(await projectLink(offer.projectId))) return { ok: false, error: "prj.missingProject" };
+    await ref.update({ ...offer, updatedAt: FieldValue.serverTimestamp() });
     await audit("offers.update", who.uid, offerId, typeof snap.data()?.number === "string" ? snap.data()?.number : "");
     return { ok: true };
   } catch {

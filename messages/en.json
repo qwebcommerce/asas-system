@@ -632,7 +632,21 @@
     "addArea": "Add area",
     "design": "Design",
     "noProject": "Not linked to a project",
-    "linkedProject": "Linked project"
+    "linkedProject": "Linked project",
+    "resetDefault": "Reset to standard",
+    "doneEditing": "Done",
+    "noStages": "No stages",
+    "discountType": "Discount type",
+    "discount_percent": "Percentage",
+    "discount_amount": "Amount (QAR)",
+    "discountPercent": "Discount (%)",
+    "discountAmount": "Discount (QAR)",
+    "discountResult": "Discount {amount} · total after discount {total}",
+    "rateFromArea": "{rate} / m²",
+    "rateRule": "Enter the area in m². The unit price follows the total area: 20 QAR/m² under 500 m², 25 QAR/m² from 500 m².",
+    "badDiscount": "Enter a whole-number discount (0–100 for a percentage).",
+    "discountHigh": "The discount can't be more than the subtotal.",
+    "editSection": "Edit"
   },
   "ov": {
     "activity": "Recent activity",
