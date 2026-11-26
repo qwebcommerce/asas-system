@@ -1,6 +1,12 @@
+import { boqPlace, boqRows, boqSectionName, boqWorkName } from "@/lib/boq";
+
 export const offerStatuses = ["draft", "sent", "accepted", "rejected", "expired"] as const;
-export const offerTrades = ["paint", "gyp", "floor", "kitchen", "design"] as const;
-export const offerUnits = ["m2", "lm", "pcs", "set"] as const;
+/** "boq": items of the construction bill of quantities (see src/lib/boq.ts) */
+export const offerTrades = ["paint", "gyp", "floor", "kitchen", "design", "boq"] as const;
+/** m3, kg, nr (number) and item are used by the construction BOQ only */
+export const offerUnits = ["m2", "lm", "pcs", "set", "m3", "kg", "nr", "item"] as const;
+/** Units offered in the fit-out measurement table */
+export const fitoutUnits = ["m2", "lm", "pcs", "set"] as const;
 /**
  * How a row's quantity is measured: wall area 2(L+W)×H, floor area L×W, a length,
  * a count, or "direct" (the quantity is typed in, e.g. an architecture area in m²).
@@ -120,7 +126,36 @@ export const priceList: PriceItem[] = [
   { id: "gyp", trade: "gyp", nameEn: "Gypsum ceiling", nameAr: "سقف جبس", unit: "m2", shape: "area", rate: 95 },
   { id: "floor", trade: "floor", nameEn: "Porcelain flooring", nameAr: "أرضية بورسلان", unit: "m2", shape: "area", rate: 165 },
   { id: "kitchen", trade: "kitchen", nameEn: "Kitchen cabinets", nameAr: "خزائن المطبخ", unit: "lm", shape: "length", rate: 2400 },
+  // Construction bill of quantities (rates from the company BOQ)
+  ...boqRows.map((place) => {
+    const name = boqWorkName(place);
+    return { id: place.row.id, trade: "boq" as const, nameEn: name.en, nameAr: name.ar, unit: place.row.unit, shape: "direct" as const, rate: place.row.rate };
+  }),
 ];
+
+/** A construction offer line for a BOQ row (the section is kept as the line's area, e.g. "Sub structure"). */
+export function boqLine(id: string, qty: number, rate: number): OfferLine | null {
+  const place = boqPlace(id);
+  const price = priceById(id);
+  if (!place || !price) return null;
+  const section = boqSectionName(place.section);
+  return {
+    roomEn: section.en,
+    roomAr: section.ar,
+    priceId: id,
+    workEn: price.nameEn,
+    workAr: price.nameAr,
+    trade: "boq",
+    l: null,
+    w: null,
+    h: null,
+    qty,
+    unit: price.unit,
+    shape: "direct",
+    rate,
+    units: 1,
+  };
+}
 
 export type OfferLine = {
   roomEn: string;
@@ -166,6 +201,10 @@ export type Offer = {
   discount: OfferDiscount;
   validUntil: string;
   lines: OfferLine[];
+  /** Construction: the project has a basement (recorded only for now) */
+  basement: boolean;
+  /** Construction: duration of the works in months (0 when not set) */
+  durationMonths: number;
 };
 
 export type OfferInput = Omit<Offer, "id" | "number">;
@@ -178,6 +217,24 @@ export function defaultPayments(): OfferPayment[] {
     { labelEn: "Third Payment", labelAr: "الدفعة الثالثة", percent: 15, whenEn: "Upon Completion of Stage Two", whenAr: "عند الانتهاء من المرحلة الثانية" },
     { labelEn: "Final Payment", labelAr: "الدفعة الأخيرة", percent: 10, whenEn: "Before The Final Stage Submission", whenAr: "قبل تسليم المرحلة الثالثة" },
   ];
+}
+
+/**
+ * Construction payment schedule, used until the client's own schedule is shared; it can be changed
+ * per offer with "Edit". Milestones follow the BOQ sections (sub structure, super structure).
+ */
+export function constructionPayments(): OfferPayment[] {
+  return [
+    { labelEn: "Down Payment", labelAr: "الدفعة الأولى", percent: 20, whenEn: "Payment upon signing this Agreement", whenAr: "عند توقيع هذا العرض" },
+    { labelEn: "Second Payment", labelAr: "الدفعة الثانية", percent: 30, whenEn: "Upon completion of the sub structure works", whenAr: "عند الانتهاء من اعمال ما تحت مستوى الصفر (الأساسات)" },
+    { labelEn: "Third Payment", labelAr: "الدفعة الثالثة", percent: 40, whenEn: "Upon completion of the super structure works", whenAr: "عند الانتهاء من اعمال ما فوق مستوى الصفر (البناء)" },
+    { labelEn: "Final Payment", labelAr: "الدفعة الأخيرة", percent: 10, whenEn: "Upon handover", whenAr: "عند التسليم" },
+  ];
+}
+
+/** Standard payment schedule of a type of offer. */
+export function defaultPaymentsFor(kind: OfferKind): OfferPayment[] {
+  return kind === "construction" ? constructionPayments() : defaultPayments();
 }
 
 /** Architecture design package, worded as in the reference quotation (one detail per line). */
@@ -209,12 +266,15 @@ export function designStages(kind: OfferKind): OfferStage[] {
 /** Price items offered for a type of offer. */
 export function priceListFor(kind: OfferKind) {
   if (isDesignKind(kind)) return priceList.filter((item) => item.id === designPriceId(kind));
-  return priceList.filter((item) => item.trade !== "design");
+  if (kind === "construction") return priceList.filter((item) => item.trade === "boq");
+  return priceList.filter((item) => item.trade !== "design" && item.trade !== "boq");
 }
 
 /** Trades shown as filters in the measurement table for a type of offer. */
 export function tradesFor(kind: OfferKind) {
-  return offerTrades.filter((trade) => (isDesignKind(kind) ? trade === "design" : trade !== "design"));
+  if (isDesignKind(kind)) return offerTrades.filter((trade) => trade === "design");
+  if (kind === "construction") return offerTrades.filter((trade) => trade === "boq");
+  return offerTrades.filter((trade) => trade !== "design" && trade !== "boq");
 }
 
 export function priceById(id: string) {
@@ -222,13 +282,14 @@ export function priceById(id: string) {
 }
 
 export function defaultShape(unit: OfferUnit, trade?: OfferTrade): MeasureShape {
+  if (trade === "boq" || unit === "m3" || unit === "kg" || unit === "nr" || unit === "item") return "direct";
   if (unit === "pcs" || unit === "set") return "count";
   if (unit === "lm") return "length";
   return trade === "paint" ? "walls" : "area";
 }
 
 export function inferShape(unit: OfferUnit, trade: OfferTrade | undefined, h: number | null, stored: unknown): MeasureShape {
-  if (stored === "direct") return "direct";
+  if (stored === "direct" || trade === "boq" || unit === "m3" || unit === "kg" || unit === "nr" || unit === "item") return "direct";
   if (unit === "pcs" || unit === "set") return "count";
   if (unit === "lm") return "length";
   if (stored === "walls" || stored === "area") return stored;
@@ -284,6 +345,10 @@ export function offerProblem(input: OfferInput) {
   if (!discountTypes.includes(input.discount.type) || !Number.isInteger(input.discount.value) || input.discount.value < 0) return "off.badDiscount";
   if (input.discount.type === "percent" && input.discount.value > 100) return "off.badDiscount";
   if (input.discount.type === "amount" && input.discount.value > offerTotals(input.lines, { type: "percent", value: 0 }).subtotal) return "off.discountHigh";
+  if (input.kind === "construction") {
+    if (!input.lines.some((line) => line.trade === "boq" && line.qty > 0)) return "off.needQty";
+    if (!Number.isInteger(input.durationMonths) || input.durationMonths < 1 || input.durationMonths > 120) return "off.needDuration";
+  }
   if (input.stages.some((stage) => !stage.titleEn.trim() || !stage.titleAr.trim())) return "off.needStage";
   if (input.payments.length < 1 || input.payments.length > 6) return "off.needPay";
   if (input.payments.some((payment) => !payment.labelEn.trim() || !payment.labelAr.trim() || !payment.whenEn.trim() || !payment.whenAr.trim())) return "off.needPay";
@@ -331,7 +396,8 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
     const price = priceById(text(row.priceId));
     const unit = offerUnits.find((entry) => entry === row.unit) ?? price?.unit;
     const trade = offerTrades.find((entry) => entry === row.trade) ?? price?.trade;
-    if (!unit || !trade || !text(row.roomEn) || !text(row.workEn)) return [];
+    // Design lines (total area only) have no area name
+    if (!unit || !trade || (!text(row.roomEn) && trade !== "design") || !text(row.workEn)) return [];
     const rate = typeof row.rate === "number" && row.rate >= 0 ? row.rate : price?.rate ?? 0;
     const storedQty = typeof row.qty === "number" && row.qty >= 0 ? row.qty : 0;
     return [{
@@ -376,6 +442,8 @@ export function mapOffer(id: string, data: Record<string, unknown>): Offer | nul
     discount: mapDiscount(data.discount, data.discountPct),
     validUntil: /^\d{4}-\d{2}-\d{2}$/.test(text(data.validUntil)) ? text(data.validUntil) : "",
     lines,
+    basement: data.basement === true,
+    durationMonths: typeof data.durationMonths === "number" && Number.isInteger(data.durationMonths) && data.durationMonths > 0 ? data.durationMonths : 0,
   };
 }
 

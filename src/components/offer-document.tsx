@@ -8,6 +8,7 @@ import { Icon } from "@/components/icon";
 import { useOffers } from "@/components/use-offers";
 import { Link } from "@/i18n/navigation";
 import { contractTerms } from "@/lib/contract-terms";
+import { boqPlace, boqSections, boqUnitLabel } from "@/lib/boq";
 import { isDesignKind, letterhead, lineAmount, lineQty, offerTotals, paymentAmounts, roomTitle, totalArea, workTitle, type Offer, type OfferKind } from "@/lib/offers";
 
 export function OfferDocument({ offerId, doc, autoPrint = false }: { offerId: string; doc: "quotation" | "contract"; autoPrint?: boolean }) {
@@ -60,6 +61,8 @@ export function OfferDocument({ offerId, doc, autoPrint = false }: { offerId: st
         </div>
       ) : doc === "contract" ? (
         <ContractSheets offer={offer} />
+      ) : offer.kind === "construction" ? (
+        <BoqSheets offer={offer} />
       ) : (
         <QuotationSheets offer={offer} />
       )}
@@ -164,11 +167,163 @@ function QuotationSheets({ offer }: { offer: Offer }) {
   );
 }
 
+/**
+ * Construction quotation, laid out as the company's "Bill of quantities for construction works":
+ * the BOQ table (sections, numbered items, lettered parts sharing one amount), its total and the
+ * total after discount; then the duration of work and the payment schedule.
+ */
+function BoqSheets({ offer }: { offer: Offer }) {
+  const totals = offerTotals(offer.lines, offer.discount);
+  const due = paymentAmounts(totals.total, offer.payments);
+  const byId = new Map(offer.lines.filter((line) => line.trade === "boq").map((line) => [line.priceId, line]));
+  const others = offer.lines.filter((line) => line.trade !== "boq" || !boqPlace(line.priceId));
+  // Items are numbered 1, 2, 3… over the items this offer includes
+  const included = boqSections.map((section) => ({ section, entries: section.entries.filter((entry) => entry.rows.some((row) => byId.has(row.id))) }));
+  const numbers = new Map(included.flatMap(({ entries }) => entries).map((entry, index) => [entry.no, index + 1]));
+  const firstOther = numbers.size + 1;
+
+  return (
+    <>
+      <Paper>
+        <DocHead offer={offer} enTitle="BILL OF QUANTITIES FOR CONSTRUCTION WORKS" arTitle="جدول الكميات وبنود الاعمال" />
+        <table className="boq-doc">
+          <thead>
+            <tr><th>Sr. No.</th><th>Descriptions</th><th>Unit</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr>
+          </thead>
+          {included.map(({ section, entries }) => {
+            if (entries.length === 0) return null;
+            return (
+              <tbody key={section.id}>
+                <tr className="boq-doc__section"><td colSpan={6}><span>{section.en}</span><span className="sheet-ar">{section.ar}</span></td></tr>
+                {entries.flatMap((entry) => {
+                  const number = numbers.get(entry.no);
+                  const rows = entry.rows.filter((row) => byId.has(row.id));
+                  if (!entry.parts) {
+                    const line = byId.get(rows[0].id)!;
+                    return [
+                      <tr key={entry.no}>
+                        <td className="boq-doc__no">{number}</td>
+                        <td><div className="boq-doc__desc"><span>{entry.en}</span><span className="sheet-ar">{entry.ar}</span></div></td>
+                        <td className="boq-doc__unit">{boqUnitLabel(line.unit)}</td>
+                        <td className="num">{fixed(line.qty)}</td>
+                        <td className="num">{fixed(line.rate)}</td>
+                        <td className="num">{money2(lineAmount(line))}</td>
+                      </tr>,
+                    ];
+                  }
+                  // One unit for all parts is printed on the item (as Concrete m³); otherwise on each part
+                  const unitOnItem = rows.every((row) => row.unit === rows[0].unit && !row.ar);
+                  return [
+                    <tr key={`${entry.no}-head`} className="boq-doc__parent">
+                      <td className="boq-doc__no">{number}</td>
+                      <td><div className="boq-doc__desc"><span>{entry.en}</span><span className="sheet-ar">{entry.ar}</span></div></td>
+                      <td className="boq-doc__unit">{unitOnItem ? boqUnitLabel(rows[0].unit) : ""}</td>
+                      <td /><td /><td />
+                    </tr>,
+                    ...rows.map((row) => {
+                      const line = byId.get(row.id)!;
+                      // Parts of one group share an amount cell (as 8a + 8b in the BOQ)
+                      const group = row.group ? rows.filter((item) => item.group === row.group) : [row];
+                      const first = group[0].id === row.id;
+                      const amount = group.reduce((sum, item) => sum + lineAmount(byId.get(item.id)!), 0);
+                      return (
+                        <tr key={row.id} className="boq-doc__part">
+                          <td />
+                          <td><div className="boq-doc__desc"><span>{row.en}</span>{row.ar ? <span className="sheet-ar">{row.ar}</span> : null}</div></td>
+                          <td className="boq-doc__unit">{unitOnItem ? "" : boqUnitLabel(row.unit)}</td>
+                          <td className="num">{fixed(line.qty)}</td>
+                          <td className="num">{fixed(line.rate)}</td>
+                          {first ? <td className="num boq-doc__amount" rowSpan={group.length}>{money2(amount)}</td> : null}
+                        </tr>
+                      );
+                    }),
+                  ];
+                })}
+              </tbody>
+            );
+          })}
+          {others.length > 0 ? (
+            <tbody>
+              <tr className="boq-doc__section"><td colSpan={6}><span>OTHER WORKS</span><span className="sheet-ar">أعمال أخرى</span></td></tr>
+              {others.map((line, index) => {
+                return (
+                  <tr key={`${line.priceId}-${index}`}>
+                    <td className="boq-doc__no">{firstOther + index}</td>
+                    <td><div className="boq-doc__desc"><span>{workTitle(line, "en")}</span><span className="sheet-ar">{workTitle(line, "ar")}</span></div></td>
+                    <td className="boq-doc__unit">{boqUnitLabel(line.unit)}</td>
+                    <td className="num">{fixed(lineQty(line))}</td>
+                    <td className="num">{fixed(line.rate)}</td>
+                    <td className="num">{money2(lineAmount(line))}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          ) : null}
+          <tfoot>
+            <tr className="boq-doc__total">
+              <td />
+              <td colSpan={4}><b>Total Amount</b></td>
+              <td className="num"><span className="boq-doc__cur">ر.ق.</span><b>{money2(totals.subtotal)}</b></td>
+            </tr>
+            {totals.discount > 0 ? (
+              <tr className="boq-doc__after">
+                <td />
+                <td colSpan={4}><span className="boq-doc__split"><i>Total Amount after discount</i><i className="sheet-ar">السعر الإجمالي بعد الخصم</i></span></td>
+                <td className="num"><span className="boq-doc__cur">ر.ق.</span><i>{money2(totals.total)}</i></td>
+              </tr>
+            ) : null}
+          </tfoot>
+        </table>
+        <Foot offer={offer} />
+      </Paper>
+      <Paper>
+        <DocHead offer={offer} enTitle="BILL OF QUANTITIES FOR CONSTRUCTION WORKS" arTitle="جدول الكميات وبنود الاعمال" />
+        <section className="doc-totals">
+          <div><span>TOTAL AMOUNT | {money(totals.subtotal)} QR</span><span className="sheet-ar">إجمالي المبلغ | {money(totals.subtotal)} ريال قطري</span></div>
+          {totals.discount > 0 ? <div><span>AFTER DISCOUNT | {money(totals.total)} QR</span><span className="sheet-ar">السعر الإجمالي بعد الخصم | {money(totals.total)} ريال قطري</span></div> : null}
+        </section>
+        {offer.durationMonths ? (
+          <div className="doc-bar">
+            <span>DURATION OF WORK | {offer.durationMonths} {offer.durationMonths === 1 ? "MONTH" : "MONTHS"}</span>
+            <span className="sheet-ar">مدة العمل | {offer.durationMonths} {monthsAr(offer.durationMonths)}</span>
+          </div>
+        ) : null}
+        <Payments offer={offer} due={due} />
+        <div className="doc-close">
+          <span>PROJECT NO. | {offer.reference || offer.number}</span>
+          <span>PROJECT | {offer.projectEn}</span>
+          <span>DATE | {offer.issuedOn || "—"}</span>
+          <span>CLIENT | {offer.clientEn}</span>
+          {offer.phone ? <span>Client contact no. | {offer.phone}</span> : null}
+          <span>{letterhead.company}</span>
+        </div>
+        <Foot offer={offer} />
+      </Paper>
+    </>
+  );
+}
+
+function fixed(value: number) {
+  return value.toFixed(2);
+}
+
+function money2(amount: number) {
+  return amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function monthsAr(months: number) {
+  if (months === 1) return "شهر";
+  if (months === 2) return "شهران";
+  return months <= 10 ? "أشهر" : "شهراً";
+}
+
 function ContractSheets({ offer }: { offer: Offer }) {
   const totals = offerTotals(offer.lines, offer.discount);
   const due = paymentAmounts(totals.total, offer.payments);
   const { en: title, ar: titleAr } = docTitles[offer.kind].contract;
-  const area = areaLabel(totalArea(offer.lines));
+  // Construction is priced by its bill of quantities, not by a floor area
+  const construction = offer.kind === "construction";
+  const area = construction ? "" : areaLabel(totalArea(offer.lines));
 
   return (
     <>
@@ -200,6 +355,10 @@ function ContractSheets({ offer }: { offer: Offer }) {
           <SectionTitle en="Project scope" ar="نطاق المشروع" />
           {offer.scopeEn ? <p>{offer.scopeEn}</p> : null}
           {offer.scopeAr ? <p className="sheet-ar">{offer.scopeAr}</p> : null}
+          {construction ? <p>Construction works (sub structure and super structure) as per the bill of quantities of quotation {offer.number}.</p> : null}
+          {construction ? <p className="sheet-ar">تنفيذ الأعمال الإنشائية (ما تحت مستوى الصفر وما فوقه) وفقاً لجدول الكميات في عرض السعر رقم {offer.number}.</p> : null}
+          {construction && offer.durationMonths ? <p>Duration of work: {offer.durationMonths} {offer.durationMonths === 1 ? "month" : "months"}.</p> : null}
+          {construction && offer.durationMonths ? <p className="sheet-ar">مدة العمل: {offer.durationMonths} {monthsAr(offer.durationMonths)}.</p> : null}
           {area ? <p>Estimated total area: {area} square metres.</p> : null}
           {area ? <p className="sheet-ar">المساحة الإجمالية التقديرية: {area} متر مربع.</p> : null}
           {offer.stages.length > 0 ? (
