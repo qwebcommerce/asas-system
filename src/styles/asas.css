@@ -1107,3 +1107,45 @@ img, svg { display: block; max-width: 100%; }
 .ai-proofs--light .ai-proof__name { color: #626467; }
 .ai-draft__missing { color: var(--danger); font-weight: 600; }
 .ai-draft__hint { color: #626467; font-size: 12px; }
+
+/* Construction offer form: bill of quantities */
+.boq-form th:nth-child(1), .boq-form td:nth-child(1) { width: 52px; }
+.boq-form th:nth-child(3), .boq-form td:nth-child(3) { width: 64px; }
+.boq-form td .input { min-width: 92px; }
+.boq-form__section td { background: var(--surface-sunken); font-weight: 600; font-size: 12.5px; letter-spacing: .04em; }
+.boq-form__section td span + span { float: inline-end; font-weight: 500; letter-spacing: 0; }
+.boq-form__desc { display: flex; flex-direction: column; gap: 2px; }
+.boq-form__desc span[dir="rtl"] { color: var(--text-2); font-size: 12.5px; }
+.boq-form__part .boq-form__desc { padding-inline-start: 18px; }
+.boq-form__parent td { border-bottom: 0; }
+
+/* Construction quotation: bill of quantities, as the company BOQ */
+.sheet table.boq-doc { border: 1px solid #8f8f8f; font-size: 10.5px; }
+.sheet .boq-doc th, .sheet .boq-doc td { border: 1px solid #b9b9b9; padding: 5px 6px; vertical-align: middle; color: #4a4a4a; }
+.sheet .boq-doc th { font-weight: 400; text-align: center; color: #555; }
+.sheet .boq-doc td.num { text-align: right; white-space: nowrap; }
+.boq-doc__no, .boq-doc__unit { text-align: center !important; white-space: nowrap; }
+.boq-doc__desc { display: flex; justify-content: space-between; gap: 10px; }
+.boq-doc__desc .sheet-ar { text-align: right; }
+.sheet .boq-doc__section td { border-left: 0; border-right: 0; }
+.boq-doc__section td { display: table-cell; }
+.boq-doc__section span + span { float: right; }
+.boq-doc__part .boq-doc__desc { padding-left: 22px; flex-direction: column; gap: 2px; }
+.sheet .boq-doc__parent td { border-bottom: 0; }
+.sheet .boq-doc__part td:not(.boq-doc__amount) { border-top: 0; border-bottom: 0; }
+.boq-doc__total td { font-weight: 600; }
+.sheet .boq-doc__after td { background: #ececec; font-weight: 600; text-decoration: underline; }
+.boq-doc__split { display: flex; justify-content: space-between; }
+.sheet .boq-doc { table-layout: fixed; }
+.sheet .boq-doc th:nth-child(1) { width: 6%; }
+.sheet .boq-doc th:nth-child(3) { width: 6%; }
+.sheet .boq-doc th:nth-child(4) { width: 10%; }
+.sheet .boq-doc th:nth-child(5) { width: 9%; }
+.sheet .boq-doc th:nth-child(6) { width: 13%; }
+.sheet .boq-doc th, .sheet .boq-doc td { padding: 3px 5px; line-height: 1.3; }
+.sheet .boq-doc th:nth-child(6) { width: 15%; }
+.boq-doc__part .boq-doc__desc { gap: 0; }
+.boq-doc__cur { margin-inline-end: 4px; }
+.boq-form td .input { min-width: 0; width: 100%; max-width: 120px; }
+.boq-form th:nth-child(4), .boq-form td:nth-child(4), .boq-form th:nth-child(5), .boq-form td:nth-child(5) { width: 120px; }
+.boq-form th:nth-child(6), .boq-form td:nth-child(6) { width: 130px; }

@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { boqRows, boqSections, boqUnitLabel } from "@/lib/boq";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { Icon } from "@/components/icon";
@@ -10,7 +11,7 @@ import { useOffers } from "@/components/use-offers";
 import { Toast } from "@/components/ui/overlay";
 import { Link, useRouter } from "@/i18n/navigation";
 import { qatarToday } from "@/lib/hr";
-import { designPriceId, designRate, designStages, discountTypes, isDesignKind, isOfferKind, defaultShape, defaultPayments, withDesignRates, lineAmount, lineQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, offerUnits, paymentAmounts, priceById, priceListFor, totalArea, tradesFor, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit, type DiscountType } from "@/lib/offers";
+import { boqLine, defaultPaymentsFor, fitoutUnits, designPriceId, designRate, designStages, discountTypes, isDesignKind, isOfferKind, defaultShape, withDesignRates, lineAmount, lineQty, offerKinds, offerProblem, offerStatuses, offerTitle, offerTotals, paymentAmounts, priceById, priceListFor, totalArea, tradesFor, type MeasureShape, type Offer, type OfferInput, type OfferKind, type OfferLine, type OfferPayment, type OfferStage, type OfferStatus, type OfferTrade, type OfferUnit, type DiscountType } from "@/lib/offers";
 import { createOffer, updateOffer } from "@/server/offers";
 
 const savedFlag = "asas-offer-saved";
@@ -133,14 +134,23 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
   const [scopeEn, setScopeEn] = useState(initial?.scopeEn ?? "");
   const [scopeAr, setScopeAr] = useState(initial?.scopeAr ?? "");
   const [stages, setStages] = useState<StageDraft[]>(() => (initial ? initial.stages : designStages(newKind)).map(stageDraft));
-  const [payments, setPayments] = useState<PayDraft[]>(() => (initial?.payments?.length ? initial.payments : defaultPayments()).map(payDraft));
+  const [payments, setPayments] = useState<PayDraft[]>(() => (initial?.payments?.length ? initial.payments : defaultPaymentsFor(kind)).map(payDraft));
   const [savedNote, setSavedNote] = useState("");
   const [toast, setToast] = useState(false);
   // Architecture and interior design: area rows in m², unit price from the total area,
   // fixed design package and payments (shown read-only until "Edit")
   const designOnly = isDesignKind(kind);
+  // Construction: bill of quantities, basement and duration; no scope text or stages, and the
+  // payment schedule is fixed and hidden until "Edit"
+  const construction = kind === "construction";
+  const fixedPayments = designOnly || construction;
   const [editStages, setEditStages] = useState(!designOnly);
-  const [editPayments, setEditPayments] = useState(!designOnly);
+  const [editPayments, setEditPayments] = useState(!fixedPayments);
+  const [boq, setBoq] = useState<Record<string, BoqDraft>>(() => boqDraft(initial));
+  // Construction offers saved with the earlier measurement table keep those rows
+  const [extraLines, setExtraLines] = useState<OfferLine[]>(() => (construction && initial ? initial.lines.filter((line) => line.trade !== "boq") : []));
+  const [basement, setBasement] = useState(initial?.basement ?? false);
+  const [duration, setDuration] = useState(initial?.durationMonths ? String(initial.durationMonths) : "");
   const [lines, setLines] = useState<DraftLine[]>(() => {
     // Design offers: one line holding the total area in m² (no area names); older offers
     // with several named areas are added up into it
@@ -156,7 +166,9 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
   // Id of the offer this form created, so a second save updates it instead of adding another
   const [createdId, setCreatedId] = useState("");
   const visible = lines.filter((line) => filter === "all" || priceById(line.priceId)?.trade === filter);
-  const measured = withDesignRates(kind, lines.map(toLine).filter((line): line is OfferLine => line !== null));
+  const measured = construction
+    ? [...boqLines(boq), ...extraLines]
+    : withDesignRates(kind, lines.map(toLine).filter((line): line is OfferLine => line !== null));
   const discountNumber = whole(discountValue, discountType === "percent" ? 100 : 100_000_000);
   const totals = offerTotals(measured, { type: discountType, value: discountNumber ?? 0 });
   const area = totalArea(measured);
@@ -207,17 +219,16 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
       kind,
       projectId,
       issuedOn,
-      scopeEn,
-      scopeAr,
-      stages: stages.map(toStage).filter((stage) => stage.titleEn || stage.titleAr || stage.detailEn || stage.detailAr),
+      scopeEn: construction ? "" : scopeEn,
+      scopeAr: construction ? "" : scopeAr,
+      stages: construction ? [] : stages.map(toStage).filter((stage) => stage.titleEn || stage.titleAr || stage.detailEn || stage.detailAr),
       payments: payments.map(toPayment),
       status,
       discount: { type: discountType, value: discountNumber ?? -1 },
       validUntil,
-      lines: withDesignRates(kind, lines.flatMap((line) => {
-        const next = toLine(line);
-        return next ? [next] : [];
-      })),
+      lines: measured,
+      basement: construction && basement,
+      durationMonths: construction ? whole(duration, 120) ?? -1 : 0,
     };
     const problem = offerProblem(input);
     if (problem) {
@@ -326,13 +337,28 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
               <Field label={t("off.projectNo")} value={reference} onChange={setReference} />
               <Field label={t("off.issuedOn")} value={issuedOn} onChange={setIssuedOn} type="date" />
             </div>
-            {designOnly ? null : (
+            {designOnly || construction ? null : (
               <>
                 <Field label={t("off.scope")} value={scopeEn} onChange={setScopeEn} area />
                 <Field label={t("off.scopeAr")} value={scopeAr} onChange={setScopeAr} area />
               </>
             )}
           </div>
+          {construction ? (
+            <div className="card stack stack--sm">
+              <h3 className="card-title">{t("off.projectDetails")}</h3>
+              <div className="form-grid form-grid--2">
+                <div className="field">
+                  <label htmlFor="offer-duration">{t("off.duration")}</label>
+                  <input id="offer-duration" className="input num" type="number" min={1} max={120} step={1} inputMode="numeric" value={duration} onChange={(event) => setDuration(event.target.value)} />
+                </div>
+                <label className="check" style={{ alignSelf: "end", paddingBottom: 10 }}>
+                  <input type="checkbox" checked={basement} onChange={(event) => setBasement(event.target.checked)} />
+                  <span>{t("off.basement")}</span>
+                </label>
+              </div>
+            </div>
+          ) : (
           <div className="card stack">
             <div className="between">
               <h3 className="card-title">{t("off.stages")}</h3>
@@ -375,7 +401,16 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
               </>
             )}
           </div>
-          {designOnly ? (
+          )}
+          {construction ? (
+            <BoqTable
+              boq={boq}
+              onChange={(id, patch) => setBoq((current) => ({ ...current, [id]: { ...current[id], ...patch } }))}
+              extraLines={extraLines}
+              onRemoveExtra={(index) => setExtraLines((current) => current.filter((_, i) => i !== index))}
+              subtotal={totals.subtotal}
+            />
+          ) : designOnly ? (
             <DesignArea
               value={lines[0]?.qty ?? ""}
               rate={unitRate}
@@ -440,7 +475,7 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
                             const unit = event.target.value as OfferUnit;
                             updateLine(line.key, { unit, shape: defaultShape(unit, priceById(line.priceId)?.trade) });
                           }}>
-                            {offerUnits.map((unit) => <option key={unit} value={unit}>{t(`off.${unit}`)}</option>)}
+                            {fitoutUnits.map((unit) => <option key={unit} value={unit}>{t(`off.${unit}`)}</option>)}
                           </select>
                           {line.unit === "m2" ? (
                             <select className="select" value={line.shape === "walls" ? "walls" : "area"} onChange={(event) => updateLine(line.key, { shape: event.target.value as MeasureShape })} style={{ marginTop: 6 }}>
@@ -480,21 +515,23 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
             </div>
             </>
           )}
-          {designOnly ? null : <p className="muted">{t("off.ratesNote")}</p>}
+          {designOnly || construction ? null : <p className="muted">{t("off.ratesNote")}</p>}
           <div className="card stack">
             <div className="between">
               <h3 className="card-title">{t("off.payments")}</h3>
               <div className="hstack">
                 {editPayments ? <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPayments((current) => [...current, payDraft({ labelEn: "", labelAr: "", percent: 0, whenEn: "", whenAr: "" })])}>{t("off.payAdd")}</button> : null}
-                {editPayments && designOnly ? <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPayments(defaultPayments().map(payDraft))}>{t("off.resetDefault")}</button> : null}
-                {designOnly ? (
+                {editPayments && fixedPayments ? <button type="button" className="btn btn--ghost btn--sm" onClick={() => setPayments(defaultPaymentsFor(kind).map(payDraft))}>{t("off.resetDefault")}</button> : null}
+                {fixedPayments ? (
                   <button type="button" className="btn btn--secondary btn--sm" onClick={() => setEditPayments((open) => !open)}>
                     {editPayments ? t("off.doneEditing") : <><Icon name="ruler" className="icon icon--sm" />{t("off.editSection")}</>}
                   </button>
                 ) : null}
               </div>
             </div>
-            {!editPayments ? (
+            {!editPayments && construction ? (
+              <p className="muted" style={{ margin: 0 }}>{t("off.paymentsHidden", { count: payments.length, split: payments.map((payment) => `${payment.percent}%`).join(" / ") })}</p>
+            ) : !editPayments ? (
               <ul className="fixed-list">
                 {payments.map((payment, index) => (
                   <li key={payment.key}>
@@ -545,7 +582,7 @@ function Editor({ initial, newKind, onCreated }: { initial: Offer | null; newKin
           <h3 className="card-title">{t("off.summary")}</h3>
           <div className="kv"><span>{t("off.client")}</span><b>{locale === "ar" ? clientAr || clientEn : clientEn || clientAr || t("time.none")}</b></div>
           <div className="kv"><span>{t("off.items")}</span><span className="num">{measured.length}</span></div>
-          {area > 0 ? <div className="kv"><span>{t("off.totalArea")}</span><span className="num"><bdi>{formatQty(area, locale)} m²</bdi></span></div> : null}
+          {area > 0 && !construction ? <div className="kv"><span>{t("off.totalArea")}</span><span className="num"><bdi>{formatQty(area, locale)} m²</bdi></span></div> : null}
           <div className="kv"><span>{t("off.subtotal")}</span><span className="num"><bdi>{formatQar(totals.subtotal, locale)}</bdi></span></div>
           {designOnly && area > 0 ? <div className="kv"><span>{t("off.unitPrice")}</span><span className="num"><bdi>{formatQar(unitRate, locale)} / m²</bdi></span></div> : null}
           <div className="kv"><span>{t("off.discount")}{discountType === "percent" ? <> <bdi className="num">{discountNumber ?? 0}%</bdi></> : null}</span><span className="num"><bdi>− {formatQar(totals.discount, locale)}</bdi></span></div>
@@ -690,6 +727,168 @@ function DesignArea({ value, rate, area, onChange }: { value: string; rate: numb
           <small className="muted"><bdi>{formatQty(area, locale)} m² × {formatQar(rate, locale)}</bdi></small>
         </div>
       </div>
+    </div>
+  );
+}
+
+type BoqDraft = { qty: string; rate: string };
+
+/** BOQ quantities and rates of a construction offer: saved values, or the BOQ rates (lump-sum items at 1). */
+function boqDraft(initial: Offer | null): Record<string, BoqDraft> {
+  return Object.fromEntries(boqRows.map(({ row }) => {
+    const saved = initial?.lines.find((line) => line.priceId === row.id);
+    if (saved) return [row.id, { qty: String(saved.qty), rate: String(saved.rate) }];
+    return [row.id, { qty: !initial && row.unit === "item" ? "1" : "", rate: String(row.rate) }];
+  }));
+}
+
+function boqNumber(value: string) {
+  const number = Number(value);
+  return value.trim() !== "" && Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+/** Offer lines of the BOQ rows that have a quantity. */
+function boqLines(boq: Record<string, BoqDraft>): OfferLine[] {
+  return boqRows.flatMap(({ row }) => {
+    const draft = boq[row.id];
+    const qty = draft ? boqNumber(draft.qty) : null;
+    const rate = draft ? boqNumber(draft.rate) : null;
+    if (!qty || rate === null) return [];
+    const line = boqLine(row.id, Math.round(qty * 100) / 100, Math.round(rate * 100) / 100);
+    return line ? [line] : [];
+  });
+}
+
+/**
+ * Construction measurements: the bill of quantities for construction works, laid out as the
+ * company BOQ (sections, numbered items, lettered parts). Quantities are entered per project;
+ * rates start at the BOQ rates. Items left empty are not included.
+ */
+function BoqTable({
+  boq,
+  onChange,
+  extraLines,
+  onRemoveExtra,
+  subtotal,
+}: {
+  boq: Record<string, BoqDraft>;
+  onChange: (id: string, patch: Partial<BoqDraft>) => void;
+  extraLines: OfferLine[];
+  onRemoveExtra: (index: number) => void;
+  subtotal: number;
+}) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const amountOf = (id: string) => {
+    const draft = boq[id];
+    const qty = draft ? boqNumber(draft.qty) : null;
+    const rate = draft ? boqNumber(draft.rate) : null;
+    return qty && rate !== null ? Math.round(qty * rate) : 0;
+  };
+  const inputs = (id: string, unit: string) => (
+    <>
+      <td data-label={t("col.unit")} className="boq-unit">{boqUnitLabel(unit)}</td>
+      <td data-label={t("off.quantity")}>
+        <input className="input num" type="number" min={0} step="0.01" inputMode="decimal" aria-label={t("off.quantity")} value={boq[id]?.qty ?? ""} onChange={(event) => onChange(id, { qty: event.target.value })} />
+      </td>
+      <td data-label={t("off.rate")}>
+        <input className="input num" type="number" min={0} step="0.01" inputMode="decimal" aria-label={t("off.rate")} value={boq[id]?.rate ?? ""} onChange={(event) => onChange(id, { rate: event.target.value })} />
+      </td>
+      <td data-label={t("off.amount")} className="num end strong"><bdi>{formatQar(amountOf(id), locale)}</bdi></td>
+    </>
+  );
+  return (
+    <div className="card card--flush table-wrap">
+      <div style={{ padding: "16px 18px 4px" }}>
+        <h3 className="card-title">{t("off.boq")}</h3>
+        <p className="muted" style={{ margin: "4px 0 0", fontSize: 13 }}>{t("off.boqHint")}</p>
+      </div>
+      <table className="table table--cards boq-form">
+        <thead>
+          <tr>
+            <th>{t("off.srNo")}</th>
+            <th>{t("off.description")}</th>
+            <th>{t("col.unit")}</th>
+            <th>{t("off.quantity")}</th>
+            <th>{t("off.rate")}</th>
+            <th className="end">{t("off.amount")}</th>
+          </tr>
+        </thead>
+        {boqSections.map((section) => (
+          <tbody key={section.id}>
+            <tr className="boq-form__section">
+              <td colSpan={6}>
+                <span>{section.en}</span>
+                <span dir="rtl" lang="ar">{section.ar}</span>
+              </td>
+            </tr>
+            {section.entries.flatMap((entry) => {
+              const head = (
+                <td data-label={t("off.description")}>
+                  <div className="boq-form__desc">
+                    <b>{entry.en}</b>
+                    <span dir="rtl" lang="ar">{entry.ar}</span>
+                  </div>
+                </td>
+              );
+              if (!entry.parts) {
+                const row = entry.rows[0];
+                return [
+                  <tr key={row.id}>
+                    <td data-label={t("off.srNo")} className="num">{entry.no}</td>
+                    {head}
+                    {inputs(row.id, row.unit)}
+                  </tr>,
+                ];
+              }
+              return [
+                <tr key={`${entry.no}-head`} className="boq-form__parent">
+                  <td data-label={t("off.srNo")} className="num">{entry.no}</td>
+                  {head}
+                  <td colSpan={4} />
+                </tr>,
+                ...entry.rows.map((row) => (
+                  <tr key={row.id} className="boq-form__part">
+                    <td />
+                    <td data-label={t("off.description")}>
+                      <div className="boq-form__desc">
+                        <span>{row.en}</span>
+                        {row.ar ? <span dir="rtl" lang="ar">{row.ar}</span> : null}
+                      </div>
+                    </td>
+                    {inputs(row.id, row.unit)}
+                  </tr>
+                )),
+              ];
+            })}
+          </tbody>
+        ))}
+        {extraLines.length > 0 ? (
+          <tbody>
+            <tr className="boq-form__section"><td colSpan={6}><span>{t("off.otherItems")}</span></td></tr>
+            {extraLines.map((line, index) => (
+              <tr key={`${line.priceId}-${index}`}>
+                <td />
+                <td data-label={t("off.description")}><div className="boq-form__desc"><b>{line.workEn}</b><span>{line.roomEn}</span></div></td>
+                <td data-label={t("col.unit")}>{boqUnitLabel(line.unit)}</td>
+                <td data-label={t("off.quantity")} className="num"><bdi>{formatQty(lineQty(line), locale)}</bdi></td>
+                <td data-label={t("off.rate")} className="num"><bdi>{formatQar(line.rate, locale)}</bdi></td>
+                <td className="end">
+                  <bdi className="num strong">{formatQar(lineAmount(line), locale)}</bdi>{" "}
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => onRemoveExtra(index)}>{t("us.delete")}</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        ) : null}
+        <tfoot>
+          <tr>
+            <td />
+            <td colSpan={4}><b>{t("off.totalAmount")}</b></td>
+            <td className="num end"><b><bdi>{formatQar(subtotal, locale)}</bdi></b></td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }

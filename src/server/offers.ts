@@ -3,7 +3,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import type { ActionResult } from "@/lib/directory";
 import { qatarToday } from "@/lib/hr";
-import { inferShape, isDesignKind, isOfferKind, measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, withDesignRates, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
+import { boqLine, inferShape, isDesignKind, isOfferKind, measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, withDesignRates, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
 import { adminDb } from "@/lib/firebase-admin";
 import { canWriteModule, seesOwn } from "@/lib/access";
 import { projectLink } from "@/server/project-link";
@@ -79,6 +79,7 @@ function clean(input: OfferInput): OfferInput | string {
     whenEn: payment.whenEn.trim().slice(0, 160),
     whenAr: payment.whenAr.trim().slice(0, 160),
   }));
+  const construction = input.kind === "construction";
   const offer: OfferInput = {
     clientEn,
     clientAr,
@@ -94,15 +95,22 @@ function clean(input: OfferInput): OfferInput | string {
     kind: input.kind,
     issuedOn: input.issuedOn,
     projectId: typeof input.projectId === "string" ? input.projectId.trim().slice(0, 64) : "",
-    scopeEn: input.scopeEn.trim().slice(0, 800),
-    scopeAr: input.scopeAr.trim().slice(0, 800),
-    stages,
+    // Construction offers have no scope text or stages: the BOQ is their scope
+    scopeEn: construction ? "" : input.scopeEn.trim().slice(0, 800),
+    scopeAr: construction ? "" : input.scopeAr.trim().slice(0, 800),
+    stages: construction ? [] : stages,
     payments,
     status: input.status,
     discount: { type: input.discount.type, value: input.discount.value },
     validUntil,
     // Design offers: the unit price comes from the total area, whatever the browser sent
-    lines: withDesignRates(input.kind, lines),
+    lines: withDesignRates(input.kind, lines).map((line) => {
+      // BOQ rows keep their section as the area, whatever the browser sent
+      if (line.trade !== "boq") return line;
+      return boqLine(line.priceId, line.qty, line.rate) ?? line;
+    }),
+    basement: construction && input.basement === true,
+    durationMonths: construction && Number.isInteger(input.durationMonths) ? input.durationMonths : 0,
   };
   const problem = offerProblem(offer);
   return problem || offer;
