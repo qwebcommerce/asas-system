@@ -102,6 +102,9 @@ export const boqSections: BoqSection[] = [
   },
 ];
 
+/** Number of numbered BOQ items (21): the manpower is split equally over them */
+export const boqEntryCount = boqSections.reduce((sum, section) => sum + section.entries.length, 0);
+
 export type BoqPlace = { section: BoqSection; entry: BoqEntry; row: BoqRow };
 
 /** Every priced BOQ row with its item and section, in BOQ order. */

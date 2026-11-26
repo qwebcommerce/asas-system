@@ -9,7 +9,7 @@ import { useOffers } from "@/components/use-offers";
 import { Link } from "@/i18n/navigation";
 import { contractTerms } from "@/lib/contract-terms";
 import { boqPlace, boqSections, boqUnitLabel } from "@/lib/boq";
-import { isDesignKind, letterhead, lineAmount, lineQty, offerTotals, paymentAmounts, roomTitle, totalArea, workTitle, type Offer, type OfferKind } from "@/lib/offers";
+import { boqCosts, isDesignKind, letterhead, lineAmount, lineQty, offerCosting, offerTotals, paymentAmounts, roomTitle, totalArea, workTitle, type Offer, type OfferKind } from "@/lib/offers";
 
 export function OfferDocument({ offerId, doc, autoPrint = false }: { offerId: string; doc: "quotation" | "contract"; autoPrint?: boolean }) {
   const t = useTranslations();
@@ -108,7 +108,7 @@ function Foot({ offer }: { offer: Offer }) {
 }
 
 function QuotationSheets({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discount);
+  const totals = offerTotals(offer.lines, offer.discount, offerCosting(offer));
   const due = paymentAmounts(totals.total, offer.payments);
   const { en: title, ar: titleAr } = docTitles[offer.kind].quotation;
   const area = areaLabel(totalArea(offer.lines));
@@ -173,9 +173,15 @@ function QuotationSheets({ offer }: { offer: Offer }) {
  * total after discount; then the duration of work and the payment schedule.
  */
 function BoqSheets({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discount);
+  const totals = offerTotals(offer.lines, offer.discount, offerCosting(offer));
   const due = paymentAmounts(totals.total, offer.payments);
   const byId = new Map(offer.lines.filter((line) => line.trade === "boq").map((line) => [line.priceId, line]));
+  // Amounts include waste, the item's share of the manpower and profit; the printed rate is
+  // the amount per unit, so quantity × rate gives the amount
+  const costing = offerCosting(offer);
+  const costs = costing ? boqCosts(offer.lines, costing) : null;
+  const amountOf = (line: Offer["lines"][number]) => costs?.get(line.priceId)?.amount ?? lineAmount(line);
+  const rateOf = (line: Offer["lines"][number]) => (line.qty > 0 ? fixed(amountOf(line) / line.qty) : "—");
   const others = offer.lines.filter((line) => line.trade !== "boq" || !boqPlace(line.priceId));
   // Items are numbered 1, 2, 3… over the items this offer includes
   const included = boqSections.map((section) => ({ section, entries: section.entries.filter((entry) => entry.rows.some((row) => byId.has(row.id))) }));
@@ -206,8 +212,8 @@ function BoqSheets({ offer }: { offer: Offer }) {
                         <td><div className="boq-doc__desc"><span>{entry.en}</span><span className="sheet-ar">{entry.ar}</span></div></td>
                         <td className="boq-doc__unit">{boqUnitLabel(line.unit)}</td>
                         <td className="num">{fixed(line.qty)}</td>
-                        <td className="num">{fixed(line.rate)}</td>
-                        <td className="num">{money2(lineAmount(line))}</td>
+                        <td className="num">{rateOf(line)}</td>
+                        <td className="num">{money2(amountOf(line))}</td>
                       </tr>,
                     ];
                   }
@@ -225,14 +231,14 @@ function BoqSheets({ offer }: { offer: Offer }) {
                       // Parts of one group share an amount cell (as 8a + 8b in the BOQ)
                       const group = row.group ? rows.filter((item) => item.group === row.group) : [row];
                       const first = group[0].id === row.id;
-                      const amount = group.reduce((sum, item) => sum + lineAmount(byId.get(item.id)!), 0);
+                      const amount = group.reduce((sum, item) => sum + amountOf(byId.get(item.id)!), 0);
                       return (
                         <tr key={row.id} className="boq-doc__part">
                           <td />
                           <td><div className="boq-doc__desc"><span>{row.en}</span>{row.ar ? <span className="sheet-ar">{row.ar}</span> : null}</div></td>
                           <td className="boq-doc__unit">{unitOnItem ? "" : boqUnitLabel(row.unit)}</td>
                           <td className="num">{fixed(line.qty)}</td>
-                          <td className="num">{fixed(line.rate)}</td>
+                          <td className="num">{rateOf(line)}</td>
                           {first ? <td className="num boq-doc__amount" rowSpan={group.length}>{money2(amount)}</td> : null}
                         </tr>
                       );
@@ -318,7 +324,7 @@ function monthsAr(months: number) {
 }
 
 function ContractSheets({ offer }: { offer: Offer }) {
-  const totals = offerTotals(offer.lines, offer.discount);
+  const totals = offerTotals(offer.lines, offer.discount, offerCosting(offer));
   const due = paymentAmounts(totals.total, offer.payments);
   const { en: title, ar: titleAr } = docTitles[offer.kind].contract;
   // Construction is priced by its bill of quantities, not by a floor area

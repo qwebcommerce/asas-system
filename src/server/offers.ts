@@ -3,7 +3,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import type { ActionResult } from "@/lib/directory";
 import { qatarToday } from "@/lib/hr";
-import { boqLine, inferShape, isDesignKind, isOfferKind, measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, withDesignRates, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
+import { boqLine, defaultCosting, inferShape, isDesignKind, isOfferKind, measureQty, offerKinds, offerProblem, offerStatuses, offerUnits, priceById, withDesignRates, type OfferInput, type OfferLine, type OfferPayment, type OfferStage } from "@/lib/offers";
 import { adminDb } from "@/lib/firebase-admin";
 import { canWriteModule, seesOwn } from "@/lib/access";
 import { projectLink } from "@/server/project-link";
@@ -111,6 +111,14 @@ function clean(input: OfferInput): OfferInput | string {
     }),
     basement: construction && input.basement === true,
     durationMonths: construction && Number.isInteger(input.durationMonths) ? input.durationMonths : 0,
+    costing: construction && input.costing && typeof input.costing === "object"
+      ? {
+          wastePct: Math.round(Number(input.costing.wastePct) * 100) / 100,
+          profitPct: Math.round(Number(input.costing.profitPct) * 100) / 100,
+          men: Number(input.costing.men),
+          manRate: Math.round(Number(input.costing.manRate) * 100) / 100,
+        }
+      : defaultCosting(),
   };
   const problem = offerProblem(offer);
   return problem || offer;
